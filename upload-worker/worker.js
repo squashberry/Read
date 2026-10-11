@@ -563,7 +563,7 @@ async function handleUpload(request, env) {
       stage = "saving the upload record";
       await env.DB.prepare("INSERT INTO uploads (id,user_id,file_id,file_name,file_path,file_size,created_at) VALUES (?,?,?,?,?,?,?)")
         .bind(crypto.randomUUID(),user.id,id,filename,path,item.file.size,now).run();
-      await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?,?,?)".replace("?,?,?,?,?,?,?","?,?,?,?,?"))
+      await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)")
         .bind(crypto.randomUUID(),user.id,"uploaded-file","Uploaded "+filename+" (file "+id+")",now).run();
       uploaded.push({
         id,name:filename,path,size:item.file.size,
