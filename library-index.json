@@ -113,6 +113,14 @@
       "size": 52242,
       "kind": "study-material",
       "transcriptPath": "study-text/014.md"
+    },
+    {
+      "id": "015",
+      "name": "ANTIMICROBIALS.ppt",
+      "path": "015 - ANTIMICROBIALS.ppt",
+      "size": 1889792,
+      "kind": "study-material",
+      "uploadedAt": "2026-10-11T23:20:07.429Z"
     }
   ]
 }
