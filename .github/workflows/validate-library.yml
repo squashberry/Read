@@ -31,6 +31,9 @@ jobs:
           new Function(html.slice(start + '<script>'.length, end));
           new Function(fs.readFileSync('upload-config.js', 'utf8'));
           console.log('App and upload-config JavaScript syntax: OK');
+          const { execFileSync } = require('node:child_process');
+          execFileSync('node', ['--input-type=module', '--check'], { input: fs.readFileSync('upload-worker/worker.js', 'utf8') });
+          console.log('Cloudflare Worker module syntax: OK');
 
           const requiredUi = [
             'data-nav="home"', 'data-nav="library"', 'data-nav="prompts"', 'data-nav="you"',
@@ -64,14 +67,18 @@ jobs:
           if (manifest.display !== 'standalone' || manifest.scope !== './') {
             throw new Error('PWA manifest must use standalone display and repository-relative scope');
           }
-          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/README.md', '.nojekyll']) {
+          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/README.md', 'robots.txt', 'sitemap.xml', '.nojekyll']) {
             if (!fs.existsSync(file)) throw new Error('Missing app asset: ' + file);
           }
           const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
           if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES')) {
             throw new Error('Upload Worker is missing its safety controls');
           }
-          console.log('PWA, social preview, and secure upload Worker assets: OK');
+          const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
+          if (!sitemap.includes('https://squashberry.github.io/Read/') || !sitemap.includes('https://squashberry.github.io/Read/gptinstruction/')) {
+            throw new Error('Sitemap is missing one or more public app pages');
+          }
+          console.log('PWA, social preview, sitemap, and secure upload Worker assets: OK');
 
           const registry = JSON.parse(fs.readFileSync('library-index.json', 'utf8'));
           if (!Array.isArray(registry.items)) throw new Error('Catalogue has no items array');
