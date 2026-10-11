@@ -1,35 +1,36 @@
 # Squashberry Library
 
-Squashberry Library is a mobile-first, installable study web app for organising learning files, reading course materials, practising exams and revising with ChatGPT.
+Squashberry Library is a mobile-first study web app for keeping learning materials together, opening numbered files, and studying with ChatGPT.
 
-**Website:** https://squashberry.github.io/Read/  
-**ChatGPT study guide:** https://squashberry.github.io/Read/gptinstruction/
+**Main app:** https://squashberry.github.io/Read/  
+**Simple ChatGPT guide:** https://squashberry.github.io/Read/gptinstruction/
 
-## Website features
+## What students can do
 
-- Four-tab floating navigation with an animated active-tab indicator: Home, Library, Prompts and You.
-- Light-first design, warm brown accents, responsive layouts, touch-friendly animations and reduced-motion support.
-- Searchable, numbered learning files with a live catalogue refresh.
-- Ready-to-copy study prompts for explanations, lectures, exams, flashcards, clinical cases and revision notes.
-- Install-to-home-screen support, offline app shell, social sharing metadata and preview artwork.
-- Direct links to the short ChatGPT study guide rather than a long technical prompt in the app.
+- Use a light-first, warm brown-and-white interface with smooth, phone-friendly animations.
+- Move between Home, Library, Prompts and You with a BerreX-inspired sliding active-tab indicator.
+- Search numbered learning files and use ready-made study prompts.
+- Install the app to a home screen; the install reminder slides down at the top and disappears after five seconds unless the app is already installed.
+- Open the short ChatGPT guide instead of copying a long technical paragraph.
+- Sign in to a personal dashboard using an email one-time code, change the display name, see upload totals/recent uploads and sign out.
+- Upload documents after signing in—without asking students for a GitHub account or personal GitHub token.
 
-## Hosting
+## Hosting and deployment status
 
-The site is a static GitHub Pages app at **https://squashberry.github.io/Read/**. The root `index.html` is the main app; `gptinstruction/index.html` serves the readable ChatGPT guide. Pages must be enabled once in repository Settings → Pages, with branch `master` and folder `/(root)`. After it is enabled, commits to `master` update the live website.
+The front end is designed for GitHub Pages at **https://squashberry.github.io/Read/**. In repository Settings → Pages, use branch `master` and folder `/(root)` if Pages has not already been enabled.
 
-## Upload options
+The account API source is in `upload-worker/worker.js`, with its D1 schema in `upload-worker/schema.sql`. It must be deployed/configured once in Cloudflare. Until its URL and the public Turnstile site key are added to `upload-config.js`, the account panel displays a setup notice and uploads remain disabled. Follow `upload-worker/README.md` for setup instructions.
 
-### Simple upload without a GitHub account
+Authentication uses Cloudflare Worker + D1 sessions/data, Cloudflare Turnstile and Resend to deliver short-lived email codes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 
-The site includes a Cloudflare Worker backend in `upload-worker/worker.js` that can receive uploads without asking students for personal tokens or a GitHub account. It stores the repository write token as a Cloudflare secret, requires Cloudflare Turnstile, applies file-type/size limits and uses a KV daily counter. See `upload-worker/README.md` for the one-time setup, then set the public Worker endpoint and Turnstile site key in `upload-config.js`.
+## Public file warning
 
-**The Worker source is committed but is not deployed by GitHub Pages.** Until you create the Worker and fill in `upload-config.js`, the site falls back to the current temporary-token uploader. Never put the secret GitHub token or Turnstile secret in website files.
+User profile and dashboard information is account-specific, **but files uploaded to the current GitHub-backed learning shelf are public** and can be downloaded by anyone. Do not upload confidential class records, patient-identifying information, passwords, API keys or documents you are not allowed to share. A truly private library would need private storage (for example Cloudflare R2) and a separate secure way to make selected document contents available to ChatGPT.
 
-### Public-file warning
+## ChatGPT study rules
 
-Files added to Library are public and can be downloaded by anyone. Never upload private records, patient-identifying information, passwords, API keys or anything you are not allowed to share.
+The page at `/Read/gptinstruction/` provides plain-language starting choices: see all available files, find a topic, or study a specific file number. The guide tells ChatGPT to use `library-index.json` only as a catalogue and study only actual uploaded documents registered as `kind: study-material`. Website code, README files, manifests, workflow files and other source/configuration files are not study material. If a document cannot be accessed or its content cannot be extracted, ChatGPT should say so honestly. For nursing or clinical topics, learning must be checked against current institutional guidance for real clinical decisions.
 
-## Study-source rules used by the ChatGPT guide
+## Search preview basics
 
-The instruction page tells ChatGPT to use `library-index.json` only to map a numbered file to its learning document, and to study only files registered as `kind: study-material`. Website source, instructions, catalogue metadata, HTML/CSS/JavaScript, manifest and workflow files must not be treated as teaching material. If a document cannot be opened or extracted, ChatGPT should say so honestly and never pretend it has read it. Nursing and clinical content is for study only; real care must follow current institutional guidance and qualified supervision.
+The site includes a title/description, canonical URL, Open Graph/Twitter preview metadata, structured WebApplication data, `robots.txt` and `sitemap.xml`. The social preview asset is kept alongside the app so link shares can show Library branding.
