@@ -248,18 +248,22 @@ async function handleVerifyCode(request, env) {
   }
   const used = await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND attempts < 5 AND expires_at > ?").bind(now,row.id,now).run();
   if (!used.meta || used.meta.changes !== 1) return response({error:"That code was already used or has expired. Request a new one."},400);
-  const existing = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE email = ?").bind(email).first();
+  const existing = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,welcome_email_sent_at FROM users WHERE email = ?").bind(email).first();
   let user = existing;
   if (!user) {
     const name = row.desired_name || cleanText(email.split("@")[0],50) || "Student";
     const id = crypto.randomUUID();
     await env.DB.prepare("INSERT INTO users (id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id,email,name,now,now).run();
-    user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+    user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,welcome_email_sent_at FROM users WHERE id = ?").bind(id).first();
     await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
-    try { await sendWelcomeEmail(email,name,env); }
-    catch (error) { console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160)); }
-    try { await sendWelcomeEmail(email,name,env); }
-    catch (error) { console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160)); }
+  }
+  if (!user.welcome_email_sent_at) {
+    try {
+      await sendWelcomeEmail(email,user.display_name || "there",env);
+      await env.DB.prepare("UPDATE users SET welcome_email_sent_at=? WHERE id=? AND welcome_email_sent_at IS NULL").bind(now,user.id).run();
+    } catch (error) {
+      console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160));
+    }
   }
   const sessionToken = randomHex(32);
   const tokenHash = await sha256Hex(sessionToken);
