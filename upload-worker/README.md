@@ -2,7 +2,7 @@
 
 This Worker powers email-code sign-in, a personal upload dashboard, and file uploads without asking students to create GitHub accounts or paste GitHub tokens. The private credentials stay on Cloudflare's server side. Sign-in codes are sent through Resend.
 
-**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io`, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend's daily-push infrastructure is deployed and scheduled; the D1 push-subscription table, VAPID keys, and service-worker actions are in place. The backend is **not fully operational yet** because the `GITHUB_TOKEN` secret is still missing and the connected Resend account has no verified sender domain. `EMAIL_FROM` is currently `Squashberry Library <onboarding@resend.dev>` and must be changed after a real sender domain is verified.
+**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io` sign-in, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend's daily-push infrastructure is deployed and scheduled; the D1 push-subscription table, VAPID keys, and service-worker actions are in place. The repository's last setup notes identify `GITHUB_TOKEN` as missing, so uploads cannot finish until that secret is added and the Worker is redeployed. The connected Resend account also has no verified sender domain; `EMAIL_FROM` is currently `Squashberry Library <onboarding@resend.dev>` and must be changed after a real sender domain is verified.
 
 The checklist below remains useful if rebuilding the service from scratch. For the current deployment, complete only the remaining owner settings described in **Current deployment: finish setup** below.
 
@@ -10,7 +10,7 @@ The checklist below remains useful if rebuilding the service from scratch. For t
 
 1. In Cloudflare → Workers & Pages → **squashberry-library-api → Settings → Variables and Secrets**, add the secret `GITHUB_TOKEN`. Use a fine-grained GitHub token scoped to only `squashberry/Read` with **Contents: Read and write**. Do not place it in `upload-config.js`, HTML files, or this README.
 2. In Resend, verify a domain you control. No active DNS zones were found in the connected Cloudflare accounts, so domain verification may require adding the required records wherever your domain's DNS is managed. Then update the Worker variable `EMAIL_FROM` to a sender address on that verified domain (for example, `Squashberry Library <library@your-domain.example>`).
-3. Visit the main site, open **You → Sign in / Create account**, and request a code to verify that email delivery works. Then try uploading a harmless sample document. The uploaded study files are stored in the public `squashberry/Read` repository, so never upload sensitive or confidential files.
+3. Visit the main site, open **You → Sign in / Create account**, and request a code to verify that email delivery works. Then try uploading a harmless sample document. The uploaded study files and extracted transcripts are stored in the public `squashberry/Read` repository, so never upload sensitive or confidential files.
 
 The Cloudflare resources already created are:
 - Worker: `squashberry-library-api`
@@ -20,6 +20,7 @@ The Cloudflare resources already created are:
 - Browser push secrets: `VAPID_PRIVATE_KEY` and `VAPID_PUBLIC_KEY` (already set as Worker secrets)
 - Cron trigger: `*/15 * * * *` (checks whether each subscribed user has reached their chosen local reminder time)
 - Existing Worker secrets: `AUTH_CODE_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`
+- Optional AI-intake secret: `GEMINI_API_KEY` (required for automatic content-based titles and unrelated-file rejection; the uploader falls back to manual confirmation when it is absent)
 - Existing bindings/variables: `DB`, `UPLOAD_RATE_LIMIT`, `EMAIL_FROM`
 - Missing upload secret: `GITHUB_TOKEN` (this is the only missing Worker secret for uploads)
 - Public API URL: `https://squashberry-library-api.squashberrypay.workers.dev`
@@ -29,10 +30,12 @@ The Cloudflare resources already created are:
 - Sign in or create an account with an email address and a six-digit, one-time code.
 - No password or GitHub account is needed for students.
 - Their email, display name, session, uploads and recent activity are stored in Cloudflare D1.
-- Uploads are accepted only from signed-in sessions and are protected with Cloudflare Turnstile.
+- Uploads require a signed-in session and daily rate limits. Cloudflare Turnstile remains on sign-in, but is not required for the file-upload request.
 - Signed-in users can enable browser push reminders at 8 AM, noon, 6 PM or 8 PM in their local time. Web Push uses VAPID, a D1 subscription table and a 15-minute cron check; notifications also offer Open Library and Share with a friend actions.
 - New accounts receive a branded welcome email with direct links to open Library and learn how to use it (email delivery requires a verified sender domain).
-- Rate limits: 8 MB per file, up to four files per upload, up to 20 files per user per UTC day, and an IP-level daily limit.
+- Before upload, the browser extracts readable text from PDF, PPTX, DOCX, TXT, MD and RTF files. If `GEMINI_API_KEY` is configured, Gemini checks the extracted text for study-library relevance and suggests a topic-based title; clearly unrelated files are blocked by the normal uploader. Without the key, users must manually confirm each file's relevance. Legacy binary `.doc` and `.ppt` files can be added manually but may not get a text transcript.
+- Extracted text is stored as `study-text/{ID}.md` and referenced by `transcriptPath` in `library-index.json`. The original file is still kept. PDF extraction is text-based in the browser and may not capture scanned pages, diagrams, or images.
+- Rate limits: 8 MB per file, up to four files per upload, up to 20 files per user per UTC day, plus an IP-level daily limit. AI review requests also have a separate daily limit.
 - Sessions expire after 14 days. Only a hash of the session token is stored in D1.
 
 ## One-time Cloudflare setup
@@ -69,7 +72,8 @@ Add these **bindings**:
 Add these **Worker secrets** (not ordinary public website variables):
 
 - `GITHUB_TOKEN`: a fine-grained GitHub token restricted to repository `squashberry/Read` and permission **Contents: Read and write**. This is a server-side token owned by the Library operator; students never see it.
-- `TURNSTILE_SECRET_KEY`: Turnstile's secret key.
+- `TURNSTILE_SECRET_KEY`: Turnstile's secret key (used for sign-in, not the upload request).
+- `GEMINI_API_KEY` (optional): create a key in Google AI Studio for automatic study-resource classification and title suggestions. Keep it in Worker Secrets; never place it in `upload-config.js` or the site JavaScript. If omitted, the uploader remains usable with manual confirmation.
 - `AUTH_CODE_SECRET`: a long random secret used to protect one-time sign-in codes. Generate one locally with `openssl rand -hex 32`.
 - `RESEND_API_KEY`: the Resend key for sending sign-in codes.
 
