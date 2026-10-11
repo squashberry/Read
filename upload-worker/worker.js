@@ -128,6 +128,10 @@ async function handleUploadReview(request, env) {
   const requestedManual = body.manual === true;
   const hasReadableText = extractedText.trim().length >= 30;
   let pdfBytes = null;
+  const titleConfirmationFallback = async () => response(await makeReviewResult(
+    user,sourceName,fileHash,extractedText,cleanLibraryTitle(body.title,sourceName),
+    true,true,"Squashberry couldn't generate a file title. Confirm this title below.",env
+  ));
   if (!hasReadableText && !requestedManual && extension(sourceName) === "pdf" && typeof body.pdfBase64 === "string") {
     const encoded = body.pdfBase64.replace(/\s/g, "");
     if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 8) {
@@ -145,10 +149,7 @@ async function handleUploadReview(request, env) {
   }
   if (env.GEMINI_API_KEY && !requestedManual) {
     if (!hasReadableText && !pdfBytes) {
-      return response({
-        ok:false, aiAvailable:true, needsManual:true,
-        error:"I couldn't extract readable text from this file. For PDFs, AI can read the original PDF directly; for legacy .doc/.ppt or unreadable office files, convert to PDF/DOCX/PPTX or choose manual review."
-      },422);
+      return titleConfirmationFallback();
     }
     const prompt = [
       "You are the intake reviewer for Squashberry Library, a public student learning-materials catalogue.",
@@ -191,17 +192,15 @@ async function handleUploadReview(request, env) {
           }
         })
       });
-    } catch {
-      return response({error:"Gemini couldn't be reached. Check the Worker network logs, retry, or choose manual review.",needsManual:true},503);
+    } catch (networkError) {
+      console.warn("Gemini upload review request failed:",cleanText(networkError && networkError.message,160));
+      return titleConfirmationFallback();
     }
     if (!aiResponse.ok) {
       const apiError = await aiResponse.json().catch(() => ({}));
       const details = cleanText(apiError && apiError.error && apiError.error.message,160);
       console.warn("Gemini upload review returned status", aiResponse.status, details);
-      return response({
-        error:"Gemini API returned HTTP " + aiResponse.status + (details ? ": " + details : ". Retry or choose manual review."),
-        needsManual:true
-      },503);
+      return titleConfirmationFallback();
     }
     const aiBody = await aiResponse.json().catch(() => ({}));
     const aiText = (aiBody.candidates && aiBody.candidates[0] && aiBody.candidates[0].content &&
@@ -210,7 +209,11 @@ async function handleUploadReview(request, env) {
     try { analysis = JSON.parse(aiText); }
     catch {
       console.warn("Gemini upload review returned invalid structured data:",cleanText(aiText,160));
-      return response({error:"Gemini returned an unreadable review. Retry, or choose manual review.",needsManual:true},502);
+      return titleConfirmationFallback();
+    }
+    if (typeof analysis.title !== "string" || !analysis.title.trim()) {
+      console.warn("Gemini upload review did not provide a title.");
+      return titleConfirmationFallback();
     }
     const relevant = analysis.relevant === true;
     const title = cleanLibraryTitle(analysis.title, sourceName);
@@ -344,13 +347,18 @@ function emailEscape(value) {
 function libraryEmailLayout(preheader, title, intro, inner) {
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Squashberry Library</title><style>@media(max-width:620px){.email-shell{width:100%!important}.email-pad{padding-left:20px!important;padding-right:20px!important}.email-title{font-size:28px!important}.email-cta{display:block!important;width:auto!important;margin:0 0 10px!important}}</style></head><body style="margin:0;padding:0;background:#f1ece6;font-family:Arial,Helvetica,sans-serif;color:#30261e"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">'+emailEscape(preheader)+'</div><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1ece6;padding:28px 10px"><tr><td align="center"><table role="presentation" class="email-shell" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background:#fffdf9;border-radius:22px;overflow:hidden;border:1px solid #e7ddd1"><tr><td class="email-pad" style="padding:28px 34px;background:#181a20;color:#fffaf4"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="48" valign="middle"><div style="width:42px;height:42px;border-radius:14px;background:#f1b572;color:#21170d;font-size:24px;line-height:42px;text-align:center;font-weight:bold">S</div></td><td style="padding-left:12px"><div style="font-size:15px;letter-spacing:1.3px;font-weight:bold;color:#fffaf4">SQUASHBERRY LIBRARY</div><div style="font-size:10px;letter-spacing:2px;color:#b8a99b;margin-top:5px;text-transform:uppercase">Study · Learn · Grow</div></td></tr></table></td></tr><tr><td class="email-pad" style="padding:34px 34px 12px"><div style="font-size:11px;letter-spacing:2px;font-weight:bold;text-transform:uppercase;color:#946744;margin-bottom:12px">YOUR STUDY SPACE</div><h1 class="email-title" style="font-size:34px;line-height:1.12;letter-spacing:-1px;margin:0 0 16px;color:#30261e;font-weight:750">'+title+'</h1><p style="font-size:15px;line-height:1.8;color:#73675d;margin:0">'+intro+'</p></td></tr><tr><td class="email-pad" style="padding:18px 34px 16px">'+inner+'</td></tr><tr><td class="email-pad" style="padding:8px 34px 32px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:0 8px 8px 0"><a class="email-cta" href="https://squashberry.github.io/Read/" style="display:inline-block;background:#82583e;border-radius:12px;padding:14px 18px;color:#fffaf4;text-decoration:none;font-size:13px;font-weight:bold">Open Library ↗</a></td><td style="padding:0 0 8px"><a class="email-cta" href="https://squashberry.github.io/Read/gptinstruction/index.html" style="display:inline-block;background:#f3e8dc;border:1px solid #e6d6c5;border-radius:12px;padding:13px 16px;color:#65472f;text-decoration:none;font-size:13px;font-weight:bold">Learn how to use Library ↗</a></td></tr></table></td></tr><tr><td class="email-pad" style="padding:22px 34px;background:#f7f1ea;border-top:1px solid #e9dfd4"><p style="font-size:12px;line-height:1.7;color:#74685e;margin:0 0 8px">A little progress still counts. Pick one topic, open one note, and begin where you are.</p><p style="font-size:11px;line-height:1.7;color:#887b70;margin:0">Privacy note: study files uploaded to the public Library repository can be seen and downloaded by anyone. Only upload material you are allowed to share.</p><p style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9b8c7e;margin:18px 0 0">Made by Squashberry</p></td></tr></table></td></tr></table></body></html>';
 }
-function signInCodeEmailHtml(code) {
+function signInCodeEmailHtml(code, displayName) {
+  const name = cleanText(displayName,50);
   const inner = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8f0e6;border:1px solid #ecdfd0;border-radius:16px"><tr><td align="center" style="padding:22px 16px"><div style="font-size:10px;letter-spacing:2px;color:#8a6a50;font-weight:bold;text-transform:uppercase">ONE-TIME SIGN-IN CODE</div><div style="font-family:Arial,sans-serif;font-size:38px;font-weight:bold;letter-spacing:9px;color:#31241b;padding:12px 0 4px">'+emailEscape(code)+'</div><div style="font-size:12px;color:#786a5d">Expires in 10 minutes · can only be used once</div></td></tr></table><p style="font-size:12px;line-height:1.7;color:#7b6e62;margin:16px 0 0">If you did not request this code, you can safely ignore this email.</p>';
-  return libraryEmailLayout("Your one-time code to sign in to Squashberry Library.", "Your sign-in code", "Enter this code on the sign-in screen to open your personal Library dashboard.", inner);
+  const intro = name ? "Hi "+emailEscape(name)+", enter this code on the sign-in screen to open your personal Library dashboard." : "Enter this code on the sign-in screen to open your personal Library dashboard.";
+  return libraryEmailLayout("Your one-time code to sign in to Squashberry Library.", "Your sign-in code", intro, inner);
 }
-function welcomeEmailHtml(displayName) {
+function welcomeEmailHtml(displayName, personalize = false) {
   const inner = '<div style="background:#f8f0e6;border:1px solid #ecdfd0;border-radius:16px;padding:20px 22px"><p style="font-size:13px;line-height:1.8;color:#594737;margin:0 0 12px">Here are three easy ways to get started:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">01</td><td style="font-size:13px;line-height:1.7;color:#594737;padding:0 0 10px"><strong>Find your notes</strong><br>Search by topic, filename, or document code on the Library tab.</td></tr><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">02</td><td style="font-size:13px;line-height:1.7;color:#594737;padding:0 0 10px"><strong>Study with ChatGPT</strong><br>Choose a file and use the study prompt to learn, revise, or practise questions.</td></tr><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">03</td><td style="font-size:13px;line-height:1.7;color:#594737"><strong>Set a small daily goal</strong><br>In the You tab, sign in and enable daily browser reminders if you want a gentle nudge.</td></tr></table></div><p style="font-size:12px;line-height:1.7;color:#7b6e62;margin:17px 0 0">No need to do everything at once. Start with one subject and build from there.</p>';
-  return libraryEmailLayout("Welcome to Squashberry Library. Your study space is ready.", "Welcome, "+emailEscape(displayName)+"!", "Your Squashberry Library account is ready. This is your calm little space to keep study materials together and take the next step in your learning.", inner);
+  const intro = personalize
+    ? "Hi "+emailEscape(displayName)+", your Squashberry Library account is ready. This is your calm little space to keep study materials together and take the next step in your learning."
+    : "Your Squashberry Library account is ready. This is your calm little space to keep study materials together and take the next step in your learning.";
+  return libraryEmailLayout("Welcome to Squashberry Library. Your study space is ready.", "Welcome, "+emailEscape(displayName)+"!", intro, inner);
 }
 async function sendLibraryEmail(email, subject, text, html, env) {
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) throw new Error("Email delivery is not configured.");
@@ -362,13 +370,14 @@ async function sendLibraryEmail(email, subject, text, html, env) {
   const body = await result.json().catch(() => ({}));
   if (!result.ok) throw new Error("Email delivery failed. " + cleanText(body.message,180));
 }
-async function sendWelcomeEmail(email, displayName, env) {
+async function sendWelcomeEmail(email, displayName, env, personalize = false) {
   const name = cleanText(displayName,50) || "there";
+  const greeting = personalize ? "Hi "+name+", " : "Welcome, "+name+"! ";
   await sendLibraryEmail(
     email,
     "Welcome to Squashberry Library — your study space is ready",
-    "Welcome, "+name+"! Your Squashberry Library account is ready. Open Library: https://squashberry.github.io/Read/ . Learn how to use Library: https://squashberry.github.io/Read/gptinstruction/index.html . Study files in the public Library repository may be viewed by anyone; only upload material you are allowed to share.",
-    welcomeEmailHtml(name),
+    greeting+"Your Squashberry Library account is ready. Open Library: https://squashberry.github.io/Read/ . Learn how to use Library: https://squashberry.github.io/Read/gptinstruction/index.html . Study files in the public Library repository may be viewed by anyone; only upload material you are allowed to share.",
+    welcomeEmailHtml(name,personalize),
     env
   );
 }
@@ -376,8 +385,10 @@ async function sendWelcomeEmail(email, displayName, env) {
 function publicUser(user) {
   return {id:user.id,email:user.email,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at,sessionExpiresAt:user.expires_at};
 }
-async function sendLoginCode(email, code, env) {
-  await sendLibraryEmail(email,"Your Squashberry Library sign-in code","Your one-time sign-in code is "+code+". It expires in 10 minutes. If you did not request it, ignore this email.",signInCodeEmailHtml(code),env);
+async function sendLoginCode(email, code, displayName, env) {
+  const name = cleanText(displayName,50);
+  const greeting = name ? "Hi "+name+",\n\n" : "";
+  await sendLibraryEmail(email,"Your Squashberry Library sign-in code",greeting+"Your one-time sign-in code is "+code+". It expires in 10 minutes. If you did not request it, ignore this email.",signInCodeEmailHtml(code,name),env);
 }
 async function handleRequestCode(request, env) {
   if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.AUTH_CODE_SECRET) return response({error:"Personal Library sign-in is not configured yet."},503);
@@ -400,7 +411,7 @@ async function handleRequestCode(request, env) {
     "INSERT INTO login_codes (id,email,code_hash,desired_name,expires_at,attempts,created_at,used_at) VALUES (?,?,?,?,?,0,?,NULL)"
   ).bind(crypto.randomUUID(),email,codeHash,displayName,now+LOGIN_CODE_TTL_SECONDS,now).run();
   try {
-    await sendLoginCode(email,code,env);
+    await sendLoginCode(email,code,displayName,env);
   } catch (error) {
     await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now,email).run();
     return response({error:cleanText(error.message,240) || "Could not send the email. Please try again later."},502);
@@ -436,7 +447,7 @@ async function handleVerifyCode(request, env) {
   }
   if (!user.welcome_email_sent_at) {
     try {
-      await sendWelcomeEmail(email,user.display_name || "there",env);
+      await sendWelcomeEmail(email,user.display_name || "there",env,Boolean(cleanText(row.desired_name,50)));
       await env.DB.prepare("UPDATE users SET welcome_email_sent_at=? WHERE id=? AND welcome_email_sent_at IS NULL").bind(now,user.id).run();
     } catch (error) {
       console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160));
