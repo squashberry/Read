@@ -1,25 +1,24 @@
 # Squashberry Library — instructions for AI assistants
 
 Website: https://squashberry.github.io/Read/
-Source repository: https://github.com/squashberry/Read
-Repository owner: squashberry
-Repository: Read
-Branch: master
-Catalogue: https://raw.githubusercontent.com/squashberry/Read/master/library-index.json
 
 ## Mandatory source-selection rule
-Do not confuse the Library application code with the study collection.
 
-- Read library-index.json only to resolve numeric file IDs. The index is catalogue metadata, not a lesson source.
-- Read only uploaded teaching materials registered as kind: study-material.
-- Never show, read aloud, quote, summarize or teach from index.html, README.md, llms.txt, library-index.json, .gitignore, .nojekyll, .github/**, HTML/CSS/JavaScript, workflow or other source/configuration files.
-- If the user names an ID such as 012, resolve that exact ID in library-index.json and read its associated document. Do not guess or substitute website code.
+Do not confuse the Library interface with the study collection.
+
+- Use the website's built-in **Study with ChatGPT** and **Prompt Shelf** actions to generate prompts with the appropriate source locator.
+- Read `library-index.json` only as catalogue metadata to map a requested numeric file ID to its uploaded learning document. The index is not teaching content.
+- Read only uploaded teaching materials registered as `kind: study-material`.
+- Never show, read aloud, quote, summarize or teach from `index.html`, `README.md`, `llms.txt`, `library-index.json`, `.gitignore`, `.nojekyll`, `.github/**`, HTML/CSS/JavaScript, workflow or other source/configuration files.
+- If the user names an ID such as 012, resolve that exact ID through the catalogue and read only its associated teaching document. Do not guess or substitute website code.
 - If the source is inaccessible or its slides/pages cannot be extracted, state the limitation honestly. Never claim to have read a document unless you did.
 - Cite the study filename and slide/page when possible, and separate source content from added explanation.
 - For nursing/clinical material, teach for educational use and remind learners to confirm clinical decisions with current institutional guidance.
 
 ## Supported learning workflows
-Read and explain, patient full lectures, source-based exams one question at a time, flashcards, revision notes, clinical cases, oral viva, explain difficult concepts and revision planning.
 
-## Website and upload limits
-Library is a GitHub Pages static progressive web app; study actions prepare prompts for ChatGPT but the website itself does not embed an AI model. Uploads require a user-supplied fine-grained GitHub token limited to the squashberry/Read repository with Contents read/write permission. The token is cleared after the session's upload action and is not persisted. The repository is public, so uploads are public.
+Read and explain, full lectures, source-based exams one question at a time, flashcards, revision notes, clinical cases, oral viva, difficult-concept explanations and revision planning.
+
+## Website and upload notes
+
+Library is an installable study web app. It fetches the live study catalogue and updates the on-screen list when files are uploaded. The website itself does not embed an AI model. Uploaded materials are publicly accessible, so never add confidential or patient-identifying information.
