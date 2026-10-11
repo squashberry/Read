@@ -2,7 +2,7 @@
 
 This Worker powers email-code sign-in, a personal upload dashboard, and file uploads without asking students to create GitHub accounts or paste GitHub tokens. The private credentials stay on Cloudflare's server side. Sign-in codes are sent through Resend.
 
-**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io` sign-in, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend's daily-push infrastructure is deployed and scheduled; the D1 push-subscription table, VAPID keys, and service-worker actions are in place. The repository's last setup notes identify `GITHUB_TOKEN` as missing, so uploads cannot finish until that secret is added and the Worker is redeployed. The connected Resend account also has no verified sender domain; `EMAIL_FROM` is currently `Squashberry Library <onboarding@resend.dev>` and must be changed after a real sender domain is verified.
+**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io` sign-in, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend's daily-push infrastructure is deployed and scheduled; the D1 push-subscription table, VAPID keys, and service-worker actions are in place. The earlier setup notes identified `GITHUB_TOKEN` as missing; it is now configured in Cloudflare, and the new Worker review/transcript code has been deployed. The connected Resend account also has no verified sender domain; `EMAIL_FROM` is currently `Squashberry Library <onboarding@resend.dev>` and must be changed after a real sender domain is verified.
 
 The checklist below remains useful if rebuilding the service from scratch. For the current deployment, complete only the remaining owner settings described in **Current deployment: finish setup** below.
 
@@ -22,7 +22,7 @@ The Cloudflare resources already created are:
 - Existing Worker secrets: `AUTH_CODE_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`
 - Optional AI-intake secret: `GEMINI_API_KEY` (required for automatic content-based titles and unrelated-file rejection; the uploader falls back to manual confirmation when it is absent)
 - Existing bindings/variables: `DB`, `UPLOAD_RATE_LIMIT`, `EMAIL_FROM`
-- Missing upload secret: `GITHUB_TOKEN` (this is the only missing Worker secret for uploads)
+- Upload secret: `GITHUB_TOKEN` (configured in the live Worker; keep its value private)
 - Public API URL: `https://squashberry-library-api.squashberrypay.workers.dev`
 
 ## What students get
