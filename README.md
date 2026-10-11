@@ -1,11 +1,9 @@
 # Library — Squashberry
 
-Library is a mobile-first, installable study web app for your uploaded learning materials. It has a four-tab floating glass navigation inspired by the BerreX interface, warm brown-and-white styling, numbered source files, copy-ready AI prompts and direct GitHub uploads.
+Library is a mobile-first, installable study web app for your uploaded learning materials. It has a four-tab floating glass navigation inspired by the BerreX interface, warm brown-and-white styling, numbered source files, copy-ready AI prompts and browser-based uploads that update the numbered file catalogue automatically.
 
 ## Host: GitHub Pages
 Expected site URL: **https://squashberry.github.io/Read/**
-
-Repository: https://github.com/squashberry/Read
 
 ### One-time activation
 Open **Settings → Pages** at https://github.com/squashberry/Read/settings/pages. Under **Build and deployment**, select **Deploy from a branch**, choose branch **master** and folder **/(root)**, then save.
@@ -33,6 +31,6 @@ When a user asks to read, study or assess Library:
 7. For nursing/clinical topics, teach for educational use and advise checking current institutional guidance for real clinical decisions.
 
 ## Privacy and upload warning
-This repository is public. “Private library” is the brand/theme, not an access-control guarantee. Anything uploaded here becomes public and can be downloaded by anyone. Do not upload confidential documents, patient-identifying information, passwords, API keys or anything the uploader is not allowed to share.
+Library materials are publicly accessible and can be downloaded by anyone. “Private library” is the brand/theme, not an access-control guarantee. Do not upload confidential documents, patient-identifying information, passwords, API keys or anything the uploader is not allowed to share.
 
 For uploads, use a fine-grained GitHub personal access token scoped only to squashberry/Read with **Contents: Read and write**. Paste it into the uploader for the session only. The token is not stored in localStorage; keep it secret and revoke it if exposed.
