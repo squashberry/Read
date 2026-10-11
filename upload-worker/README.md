@@ -2,7 +2,22 @@
 
 This Worker powers email-code sign-in, a personal upload dashboard, and file uploads without asking students to create GitHub accounts or paste GitHub tokens. The private credentials stay on Cloudflare's server side. Sign-in codes are sent through Resend.
 
-**Important:** these files are the backend source/setup guide, not a deployed live service. The account and account-only upload UI will stay in setup mode until the Worker, bindings and public config are completed.
+**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io`, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend is **not fully operational yet** because the `GITHUB_TOKEN` secret is still missing and the connected Resend account has no verified sender domain. The initial `EMAIL_FROM` value (`onboarding@resend.dev`) is a test sender, not production email setup.
+
+The checklist below remains useful if rebuilding the service from scratch. For the current deployment, complete only the remaining owner settings described in **Current deployment: finish setup** below.
+
+## Current deployment: finish setup
+
+1. In Cloudflare → Workers & Pages → **squashberry-library-api → Settings → Variables and Secrets**, add the secret `GITHUB_TOKEN`. Use a fine-grained GitHub token scoped to only `squashberry/Read` with **Contents: Read and write**. Do not place it in `upload-config.js`, HTML files, or this README.
+2. In Resend, verify a domain you control. No active DNS zones were found in the connected Cloudflare accounts, so domain verification may require adding the required records wherever your domain's DNS is managed. Then update the Worker variable `EMAIL_FROM` to a sender address on that verified domain (for example, `Squashberry Library <library@your-domain.example>`).
+3. Visit the main site, open **You → Sign in / Create account**, and request a code to verify that email delivery works. Then try uploading a harmless sample document. The uploaded study files are stored in the public `squashberry/Read` repository, so never upload sensitive or confidential files.
+
+The Cloudflare resources already created are:
+- Worker: `squashberry-library-api`
+- D1: `squashberry-library-db` (`846a2e7a-f9ba-4838-a593-294ab3d862e3`)
+- KV: `SQUASHBERRY_LIBRARY_RATE_LIMIT`
+- Turnstile widget: `Squashberry Library Login and Upload`, allowed hostname `squashberry.github.io`
+- Public API URL: `https://squashberry-library-api.squashberrypay.workers.dev`
 
 ## What students get
 
@@ -14,6 +29,8 @@ This Worker powers email-code sign-in, a personal upload dashboard, and file upl
 - Sessions expire after 14 days. Only a hash of the session token is stored in D1.
 
 ## One-time Cloudflare setup
+
+If you are setting this up in a new Cloudflare account, follow these steps. The deployed Squashberry Library account already has the corresponding resources above; use **Current deployment: finish setup** instead to complete it.
 
 ### 1. Create the D1 database
 
