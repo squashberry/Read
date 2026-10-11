@@ -1,0 +1,41 @@
+name: Validate Library web app
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check inline JavaScript syntax and numbered catalogue
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+          if (!scripts.length) throw new Error('No inline script found in index.html');
+          scripts.forEach((match, i) => {
+            new Function(match[1]);
+            console.log('Inline script ' + (i + 1) + ': syntax OK');
+          });
+          const registry = JSON.parse(fs.readFileSync('library-index.json', 'utf8'));
+          if (!Array.isArray(registry.items)) throw new Error('Catalogue has no items array');
+          const ids = registry.items.map(item => String(item.id));
+          if (new Set(ids).size !== ids.length) throw new Error('Duplicate file IDs found');
+          const missing = registry.items.filter(item => !item.id || !item.name || !item.path || item.kind !== 'study-material');
+          if (missing.length) throw new Error('Catalogue entries are missing required study-material metadata');
+          console.log('Catalogue OK: ' + registry.items.length + ' uniquely numbered learning files.');
+          NODE
