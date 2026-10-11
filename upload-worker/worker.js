@@ -269,6 +269,7 @@ async function githubRequest(path, token, init = {}) {
     headers: {
       "accept":"application/vnd.github+json",
       "authorization":"Bearer " + token,
+      "user-agent":"SquashberryLibrary/1.0 (+https://squashberry.github.io/Read/)",
       "x-github-api-version":"2022-11-28",
       ...(init.headers || {})
     }
