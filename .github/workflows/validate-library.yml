@@ -64,7 +64,8 @@ jobs:
           if (html.includes('onrender.com')) throw new Error('The app source must not depend on Render hosting.');
 
           const guide = fs.readFileSync('gptinstruction/index.html', 'utf8');
-          if (!guide.includes('Show me the files') || !guide.includes('find a topic') || !guide.includes('study a file number')) {
+          const guideLower = guide.toLowerCase();
+          if (!guideLower.includes('show me the files') || !guideLower.includes('find a topic') || !guideLower.includes('study a file number')) {
             throw new Error('The ChatGPT instruction page is missing simple learner paths');
           }
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
