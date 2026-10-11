@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "repository": "squashberry/Read",
+  "description": "Stable IDs for uploaded learning material. This index is metadata and is never a study source.",
+  "items": [
+    {
+      "id": "001",
+      "name": "ANGINA.pptx",
+      "path": "ANGINA.pptx",
+      "size": 52001,
+      "kind": "study-material"
+    },
+    {
+      "id": "002",
+      "name": "Arteriosclerosis Group 4 FINAL.pptx",
+      "path": "Arteriosclerosis Group 4 FINAL.pptx",
+      "size": 47211,
+      "kind": "study-material"
+    },
+    {
+      "id": "003",
+      "name": "CONGESTIVE HEART FAILURE (CHF).pptx",
+      "path": "CONGESTIVE HEART FAILURE (CHF).pptx",
+      "size": 54257,
+      "kind": "study-material"
+    },
+    {
+      "id": "004",
+      "name": "CORONARY ARTERY DISEASES.pptx",
+      "path": "CORONARY ARTERY DISEASES.pptx",
+      "size": 63217,
+      "kind": "study-material"
+    },
+    {
+      "id": "005",
+      "name": "CROHN'S DISEASE.pptx",
+      "path": "CROHN'S DISEASE.pptx",
+      "size": 58629,
+      "kind": "study-material"
+    },
+    {
+      "id": "006",
+      "name": "G3 JUNE 2K25 MR HYDARA PPT.pptx",
+      "path": "G3 JUNE 2K25 MR HYDARA PPT.pptx",
+      "size": 64193,
+      "kind": "study-material"
+    },
+    {
+      "id": "007",
+      "name": "GASTROESOPHAGEAL REFLUX DISEASE(GERD).pptx",
+      "path": "GASTROESOPHAGEAL REFLUX DISEASE(GERD).pptx",
+      "size": 53147,
+      "kind": "study-material"
+    },
+    {
+      "id": "008",
+      "name": "GCS.pptx",
+      "path": "GCS.pptx",
+      "size": 56773,
+      "kind": "study-material"
+    },
+    {
+      "id": "009",
+      "name": "GROUP 7 MR HYDRA.pptx",
+      "path": "GROUP 7 MR HYDRA.pptx",
+      "size": 135700,
+      "kind": "study-material"
+    },
+    {
+      "id": "010",
+      "name": "HERNIA-updated.pptx",
+      "path": "HERNIA-updated.pptx",
+      "size": 1263896,
+      "kind": "study-material"
+    },
+    {
+      "id": "011",
+      "name": "PANCREATITIS.pptx",
+      "path": "PANCREATITIS.pptx",
+      "size": 479478,
+      "kind": "study-material"
+    },
+    {
+      "id": "012",
+      "name": "Presentation outlines hydara.pptx",
+      "path": "Presentation outlines hydara.pptx",
+      "size": 2676519,
+      "kind": "study-material"
+    },
+    {
+      "id": "013",
+      "name": "Shock.pptx",
+      "path": "Shock.pptx",
+      "size": 64437,
+      "kind": "study-material"
+    },
+    {
+      "id": "014",
+      "name": "VALVULAR HEART DISEASE.pptx",
+      "path": "VALVULAR HEART DISEASE.pptx",
+      "size": 52242,
+      "kind": "study-material"
+    }
+  ]
+}
