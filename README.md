@@ -1,36 +1,35 @@
-# Library — Squashberry
+# Squashberry Library
 
-Library is a mobile-first, installable study web app for your uploaded learning materials. It has a four-tab floating glass navigation inspired by the BerreX interface, warm brown-and-white styling, numbered source files, copy-ready AI prompts and browser-based uploads that update the numbered file catalogue automatically.
+Squashberry Library is a mobile-first, installable study web app for organising learning files, reading course materials, practising exams and revising with ChatGPT.
 
-## Host: GitHub Pages
-Expected site URL: **https://squashberry.github.io/Read/**
+**Website:** https://squashberry.github.io/Read/  
+**ChatGPT study guide:** https://squashberry.github.io/Read/gptinstruction/
 
-### One-time activation
-Open **Settings → Pages** at https://github.com/squashberry/Read/settings/pages. Under **Build and deployment**, select **Deploy from a branch**, choose branch **master** and folder **/(root)**, then save.
+## Website features
 
-The root index.html is the application. The manifest.webmanifest, icon.svg and sw.js files provide installation metadata, an app icon and an offline app shell. After Pages finishes activating, the app will be available at the URL above, and commits to master will update the live site.
+- Four-tab floating navigation with an animated active-tab indicator: Home, Library, Prompts and You.
+- Light-first design, warm brown accents, responsive layouts, touch-friendly animations and reduced-motion support.
+- Searchable, numbered learning files with a live catalogue refresh.
+- Ready-to-copy study prompts for explanations, lectures, exams, flashcards, clinical cases and revision notes.
+- Install-to-home-screen support, offline app shell, social sharing metadata and preview artwork.
+- Direct links to the short ChatGPT study guide rather than a long technical prompt in the app.
 
-## Web-app features
-- Home, Library, Prompts and You tabs in a floating, glass-style navigation bar.
-- Mobile-first layouts, safe-area-aware bottom navigation, responsive file cards and animated sheets/popups.
-- Install-to-home-screen support and a service worker for caching the app shell.
-- Search/filter the study library and preview compatible files.
-- Stable numeric IDs in library-index.json (for example, file ID 012).
-- Copyable prompts for reading, full lectures, exams, flashcards, clinical case practice, revision notes, oral viva, explanations and planning.
-- Upload study files to this GitHub repository using the browser's GitHub Contents API. Users provide a fine-grained token only for the upload session; the site does not save it.
-- A friend/classmate sharing popup; its primary action copies the share message and changes to “Copied!”.
+## Hosting
 
-## Critical instructions for ChatGPT
-When a user asks to read, study or assess Library:
-1. Read library-index.json **only as a catalogue** for mapping file IDs to source-document paths. Never teach from the catalogue.
-2. Study only actual uploaded learning materials registered with kind: study-material, such as PowerPoint, PDF, Word and study-text documents.
-3. **Never send, quote, summarize, display, read aloud or explain website/source/config files as study material.** Ignore index.html, README.md, llms.txt, library-index.json, .gitignore, .nojekyll, .github/**, workflow files, HTML/CSS/JavaScript and build/configuration files.
-4. For a request such as “use file 012”, resolve that exact ID using library-index.json and open only the corresponding uploaded teaching document. Never guess an ID or substitute website code.
-5. If the document cannot be retrieved or its text/slides cannot be extracted, say so plainly. Never claim to have read content that was inaccessible.
-6. Cite the actual study filename and slide/page where possible. Distinguish information from the source from supplementary teaching.
-7. For nursing/clinical topics, teach for educational use and advise checking current institutional guidance for real clinical decisions.
+The site is a static GitHub Pages app at **https://squashberry.github.io/Read/**. The root `index.html` is the main app; `gptinstruction/index.html` serves the readable ChatGPT guide. Pages must be enabled once in repository Settings → Pages, with branch `master` and folder `/(root)`. After it is enabled, commits to `master` update the live website.
 
-## Privacy and upload warning
-Library materials are publicly accessible and can be downloaded by anyone. “Private library” is the brand/theme, not an access-control guarantee. Do not upload confidential documents, patient-identifying information, passwords, API keys or anything the uploader is not allowed to share.
+## Upload options
 
-For uploads, use a fine-grained GitHub personal access token scoped only to squashberry/Read with **Contents: Read and write**. Paste it into the uploader for the session only. The token is not stored in localStorage; keep it secret and revoke it if exposed.
+### Simple upload without a GitHub account
+
+The site includes a Cloudflare Worker backend in `upload-worker/worker.js` that can receive uploads without asking students for personal tokens or a GitHub account. It stores the repository write token as a Cloudflare secret, requires Cloudflare Turnstile, applies file-type/size limits and uses a KV daily counter. See `upload-worker/README.md` for the one-time setup, then set the public Worker endpoint and Turnstile site key in `upload-config.js`.
+
+**The Worker source is committed but is not deployed by GitHub Pages.** Until you create the Worker and fill in `upload-config.js`, the site falls back to the current temporary-token uploader. Never put the secret GitHub token or Turnstile secret in website files.
+
+### Public-file warning
+
+Files added to Library are public and can be downloaded by anyone. Never upload private records, patient-identifying information, passwords, API keys or anything you are not allowed to share.
+
+## Study-source rules used by the ChatGPT guide
+
+The instruction page tells ChatGPT to use `library-index.json` only to map a numbered file to its learning document, and to study only files registered as `kind: study-material`. Website source, instructions, catalogue metadata, HTML/CSS/JavaScript, manifest and workflow files must not be treated as teaching material. If a document cannot be opened or extracted, ChatGPT should say so honestly and never pretend it has read it. Nursing and clinical content is for study only; real care must follow current institutional guidance and qualified supervision.
