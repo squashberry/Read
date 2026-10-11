@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "Library — Squashberry",
+  "short_name": "Library",
+  "description": "Your quiet study space. Read, learn, revise and practise from your numbered study files.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f7f3ee",
+  "theme_color": "#80583f",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
