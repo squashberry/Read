@@ -2,7 +2,7 @@
 
 This Worker powers email-code sign-in, a personal upload dashboard, and file uploads without asking students to create GitHub accounts or paste GitHub tokens. The private credentials stay on Cloudflare's server side. Sign-in codes are sent through Resend.
 
-**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io`, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend is **not fully operational yet** because the `GITHUB_TOKEN` secret is still missing and the connected Resend account has no verified sender domain. The initial `EMAIL_FROM` value (`onboarding@resend.dev`) is a test sender, not production email setup.
+**Deployment status (11 October 2026):** the Worker is deployed at `https://squashberry-library-api.squashberrypay.workers.dev`; the D1 schema and KV rate-limit namespace are created, the Turnstile widget is configured for `squashberry.github.io`, and `upload-config.js` points to the live endpoint. The public `/health` endpoint responds from the Library website. The backend's daily-push infrastructure is deployed and scheduled; the D1 push-subscription table, VAPID keys, and service-worker actions are in place. The backend is **not fully operational yet** because the `GITHUB_TOKEN` secret is still missing and the connected Resend account has no verified sender domain. `EMAIL_FROM` is currently `Squashberry Library <onboarding@resend.dev>` and must be changed after a real sender domain is verified.
 
 The checklist below remains useful if rebuilding the service from scratch. For the current deployment, complete only the remaining owner settings described in **Current deployment: finish setup** below.
 
@@ -17,6 +17,11 @@ The Cloudflare resources already created are:
 - D1: `squashberry-library-db` (`846a2e7a-f9ba-4838-a593-294ab3d862e3`)
 - KV: `SQUASHBERRY_LIBRARY_RATE_LIMIT`
 - Turnstile widget: `Squashberry Library Login and Upload`, allowed hostname `squashberry.github.io`
+- Browser push secrets: `VAPID_PRIVATE_KEY` and `VAPID_PUBLIC_KEY` (already set as Worker secrets)
+- Cron trigger: `*/15 * * * *` (checks whether each subscribed user has reached their chosen local reminder time)
+- Existing Worker secrets: `AUTH_CODE_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`
+- Existing bindings/variables: `DB`, `UPLOAD_RATE_LIMIT`, `EMAIL_FROM`
+- Missing upload secret: `GITHUB_TOKEN` (this is the only missing Worker secret for uploads)
 - Public API URL: `https://squashberry-library-api.squashberrypay.workers.dev`
 
 ## What students get
@@ -25,6 +30,8 @@ The Cloudflare resources already created are:
 - No password or GitHub account is needed for students.
 - Their email, display name, session, uploads and recent activity are stored in Cloudflare D1.
 - Uploads are accepted only from signed-in sessions and are protected with Cloudflare Turnstile.
+- Signed-in users can enable browser push reminders at 8 AM, noon, 6 PM or 8 PM in their local time. Web Push uses VAPID, a D1 subscription table and a 15-minute cron check; notifications also offer Open Library and Share with a friend actions.
+- New accounts receive a branded welcome email with direct links to open Library and learn how to use it (email delivery requires a verified sender domain).
 - Rate limits: 8 MB per file, up to four files per upload, up to 20 files per user per UTC day, and an IP-level daily limit.
 - Sessions expire after 14 days. Only a hash of the session token is stored in D1.
 
