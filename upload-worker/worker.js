@@ -45,8 +45,65 @@ async function gh(path, token, init = {}) {
     }
   });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error("Storage service returned " + response.status + (body.message ? ": " + body.message : ""));
+  if (!response.ok) {
+    const error = new Error("Storage service returned " + response.status + (body.message ? ": " + body.message : ""));
+    error.status = response.status;
+    throw error;
+  }
   return body;
+}
+async function readCatalogue(token) {
+  const registry = await gh("/contents/library-index.json?ref=" + BRANCH, token);
+  const catalogue = JSON.parse(decodeUtf8Base64(registry.content));
+  if (!Array.isArray(catalogue.items)) throw new Error("The numbered file catalogue is invalid.");
+  return {registry,catalogue};
+}
+async function saveCatalogue(catalogue, token, sha, message) {
+  return gh("/contents/library-index.json", token, {
+    method:"PUT",
+    headers:{"content-type":"application/json"},
+    body:JSON.stringify({
+      message,
+      content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),
+      sha,
+      branch:BRANCH
+    })
+  });
+}
+async function reserveEntry(filename, size, token) {
+  for (let attempt=0; attempt<5; attempt++) {
+    const {registry,catalogue} = await readCatalogue(token);
+    const next = Math.max(0, ...catalogue.items.map(item => Number.parseInt(item.id,10) || 0)) + 1;
+    const id = String(next).padStart(3,"0");
+    const entry = {id,name:filename,path:id+" - "+filename,size,kind:"upload-pending",uploadedAt:new Date().toISOString()};
+    catalogue.items.push(entry);
+    catalogue.items.sort((a,b) => Number(a.id)-Number(b.id));
+    try {
+      const result = await saveCatalogue(catalogue,token,registry.sha,"Reserve study file ID "+id);
+      return {entry,sha:result.content.sha};
+    } catch (error) {
+      if (error && (error.status===409 || error.status===422) && attempt<4) continue;
+      throw error;
+    }
+  }
+  throw new Error("The file number could not be reserved. Please try again.");
+}
+async function publishEntry(id, token) {
+  for (let attempt=0; attempt<5; attempt++) {
+    const {registry,catalogue} = await readCatalogue(token);
+    const entry = catalogue.items.find(item => String(item.id).padStart(3,"0") === String(id).padStart(3,"0"));
+    if (!entry) throw new Error("The reserved file number is missing from the catalogue.");
+    if (entry.kind === "study-material") return;
+    entry.kind = "study-material";
+    try {
+      await saveCatalogue(catalogue,token,registry.sha,"Publish study file "+id);
+      return;
+    } catch (error) {
+      if (error && (error.status===409 || error.status===422) && attempt<4) continue;
+      throw error;
+    }
+  }
+  throw new Error("The uploaded file could not be published in the catalogue. Please retry or contact the Library owner.");
 }
 async function verifyTurnstile(token, ip, secret) {
   const body = new URLSearchParams({secret, response: token});
@@ -93,41 +150,19 @@ export default {
     try {
       // Count attempts before writing so failed requests cannot bypass the daily limit.
       await env.UPLOAD_RATE_LIMIT.put(rateKey, String(used + uploads.length), {expirationTtl: 86400});
-      let reg = await gh("/contents/library-index.json?ref=" + BRANCH, env.GITHUB_TOKEN);
-      const catalogue = JSON.parse(decodeUtf8Base64(reg.content));
-      if (!Array.isArray(catalogue.items)) throw new Error("The numbered file catalogue is invalid.");
-      let next = Math.max(0, ...catalogue.items.map(item => Number.parseInt(item.id,10) || 0)) + 1;
       for (const file of uploads) {
-        const id = String(next++).padStart(3,"0");
         const filename = safeName(file.name);
-        const path = id + " - " + filename;
-        const encodedPath = path.split("/").map(encodeURIComponent).join("/");
-        const entry = {id,name:filename,path,size:file.size,kind:"upload-pending",uploadedAt:new Date().toISOString()};
-        // Reserve the ID in the catalogue first. The SHA check prevents two simultaneous uploads
-        // from silently allocating the same number.
-        catalogue.items.push(entry);
-        catalogue.items.sort((a,b) => Number(a.id)-Number(b.id));
-        const reservation = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
-          method:"PUT",
-          headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Reserve study file ID " + id,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),sha:reg.sha,branch:BRANCH})
-        });
-        reg = {sha:reservation.content.sha};
+        const {entry} = await reserveEntry(filename,file.size,env.GITHUB_TOKEN);
+        const id = entry.id;
+        const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
         const bytes = new Uint8Array(await file.arrayBuffer());
         await gh("/contents/" + encodedPath, env.GITHUB_TOKEN, {
           method:"PUT",
           headers:{"content-type":"application/json"},
           body:JSON.stringify({message:"Upload study material " + id + " - " + filename,content:bytesToBase64(bytes),branch:BRANCH})
         });
-        // Publish only after the file contents have been saved successfully.
-        entry.kind = "study-material";
-        const update = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
-          method:"PUT",
-          headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Publish study file " + id + " - " + filename,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),sha:reg.sha,branch:BRANCH})
-        });
-        reg = {sha:update.content.sha};
-        uploaded.push({id,name:filename,path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
+        await publishEntry(id,env.GITHUB_TOKEN);
+        uploaded.push({id,name:filename,path:entry.path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
       }
       return json({ok:true,files:uploaded});
     } catch (error) {
