@@ -51,6 +51,9 @@ jobs:
           if (html.includes('id="repoLink"') || html.includes('Open website ↗')) {
             throw new Error('Redundant Open website link remains in the UI');
           }
+          if (html.includes('githubToken') || html.includes('githubRequest(') || html.includes('function handleUpload()')) {
+            throw new Error('Legacy client-side GitHub token uploader should not be present');
+          }
           if (html.includes('onrender.com')) throw new Error('The app source must not depend on Render hosting.');
 
           const guide = fs.readFileSync('gptinstruction/index.html', 'utf8');
