@@ -3,9 +3,9 @@
 Welcome to Squashberry's private library: a calm, iOS-inspired study web app for the files in this repository.
 
 ## Website
-Once GitHub Pages deployment is active, the site is available at:
+**Live site:** https://squashberry-library.onrender.com/
 
-https://squashberry.github.io/Read/
+**Source repository:** https://github.com/squashberry/Read
 
 ## What it does
 - Reads the file list directly from the public GitHub repository using the GitHub Contents API.
@@ -14,11 +14,14 @@ https://squashberry.github.io/Read/
 - Opens ChatGPT with study prompts to lecture, explain, summarize, create exams, flashcards, quizzes and concept maps from the selected source.
 - Includes a morphing splash screen, first-visit greeting, animated glass-style navigation, light/dark mode and responsive mobile layout.
 
-## Important note about AI
-The website does not have its own AI model or API key. AI study actions open ChatGPT with a detailed prompt and the selected repository file links. The user may need to be signed in to ChatGPT, and ChatGPT must be able to access the public source links. It should be honest if it cannot retrieve a particular file.
+## AI access instructions
+When a user opens this library and asks for help studying, start at https://github.com/squashberry/Read and inspect the files in that repository before making claims about their contents. Use the actual slide/document text when accessible; mention which filename supports the answer. Do not pretend to have read a file that was inaccessible. The website is hosted at https://squashberry-library.onrender.com/.
 
-## Instructions for ChatGPT
-When a user opens this library and asks for help studying, start at https://github.com/squashberry/Read and inspect the files in that repository before making claims about their contents. Use the actual slide/document text when accessible; mention which filename supports the answer. Do not pretend to have read a file that was inaccessible. The web application is hosted from this same repository at https://squashberry.github.io/Read/.
+## How the AI tools work
+The website does not have its own AI model or API key. Study actions open ChatGPT with a detailed prompt and the selected repository file links. The user may need to be signed in to ChatGPT, and ChatGPT must be able to access the public source links. It should be honest if it cannot retrieve a particular file.
 
-## Keep files and privacy in mind
+## Automatic publishing
+The site is linked to this repository on Render and is configured to deploy when the `master` branch changes. Add or update site code here; the deployment will update from the repository automatically.
+
+## Privacy
 This repository is currently public, so its files and source code are accessible to anyone on the internet. “Private library” is the brand/theme, not an access-control guarantee. Do not upload patient-identifying information, passwords, API keys, or other confidential material.
