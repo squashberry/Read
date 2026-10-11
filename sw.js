@@ -14,9 +14,13 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).then((response) => {
       const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+      const isGuide = url.pathname.toLowerCase().includes("/gptinstruction");
+      caches.open(CACHE_NAME).then((cache) => cache.put(isGuide ? "./gptinstruction/" : "./index.html", copy));
       return response;
-    }).catch(() => caches.match("./index.html").then((cached) => cached || caches.match("./"))));
+    }).catch(() => {
+      const isGuide = url.pathname.toLowerCase().includes("/gptinstruction");
+      return caches.match(request).then((cached) => cached || caches.match(isGuide ? "./gptinstruction/" : "./index.html") || caches.match("./"));
+    }));
     return;
   }
   event.respondWith(caches.match(request).then((cached) => cached || fetch(request).then((response) => {
