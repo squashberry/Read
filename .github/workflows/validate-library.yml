@@ -43,7 +43,7 @@ jobs:
             'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'fetch(apiBase()+"/upload"',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
-            'rawFileUrl(file.path)', 'rawFileUrl("study-text/"+fileId(file)+".md")',
+            'rawFileUrl(file.path)', 'sourceItem&&sourceItem.transcriptPath',
             'Search topics or file code', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
             'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
@@ -109,6 +109,14 @@ jobs:
           const missing = registry.items.filter(item => !item.id || !item.name || !item.path || item.kind !== 'study-material');
           if (missing.length) throw new Error('Catalogue entries are missing required study-material metadata');
           console.log('Catalogue OK: ' + registry.items.length + ' uniquely numbered learning files.');
+          for (const item of registry.items) {
+            if (item.transcriptPath) {
+              const expectedTranscript = 'study-text/' + String(item.id).padStart(3, '0') + '.md';
+              if (item.transcriptPath !== expectedTranscript) throw new Error('Unexpected transcript path for file ' + item.id);
+              if (!fs.existsSync(item.transcriptPath)) throw new Error('Missing registered transcript: ' + item.transcriptPath);
+            }
+          }
+          console.log('Optional transcript links: OK; only files with actual transcripts are linked.');
           for (const item of registry.items) {
             const id = String(item.id).padStart(3, '0');
             const transcriptPath = 'study-text/' + id + '.md';
