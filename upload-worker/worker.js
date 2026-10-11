@@ -615,8 +615,17 @@ async function handleUpload(request, env) {
     }
     return response({ok:true,files:uploaded});
   } catch (error) {
-    console.error("Library upload failed at "+stage, cleanText(error && error.message,220));
-    return response({error:"Upload failed while "+stage+": "+cleanText(error && error.message,180),stage},502);
+    const detail = cleanText(error && error.message,180);
+    console.error("Library upload failed at "+stage, detail);
+    if (uploaded.length) {
+      return response({
+        ok:true,
+        partial:true,
+        files:uploaded,
+        warning:"Some files were saved, but another file failed while "+stage+": "+detail
+      });
+    }
+    return response({error:"Upload failed while "+stage+": "+detail,stage,providerStatus:Number(error && error.status)||null},502);
   }
 }
 
