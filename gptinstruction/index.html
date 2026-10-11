@@ -42,7 +42,7 @@
 <div class="step"><span class="num">B</span><div><b>“Which file would you like to use?”</b><p>If several notes match the topic, ChatGPT should show their names and numbers before choosing.</p></div></div>
 <div class="step"><span class="num">C</span><div><b>“Would you like a simple explanation, a full lesson, revision notes, flashcards or exam practice?”</b><p>You can ask for a different way at any point. Exam practice should ask one question at a time.</p></div></div>
 </div>
-<p class="tip"><b>If a file can’t be found:</b> ChatGPT should say so clearly, then direct you to <a href="../?upload=1">Upload a study file</a>. It must never pretend it has read a file it could not open.</p>
+<p class="tip"><b>If a file can’t be found:</b> ChatGPT should say so clearly, then direct you to <a href="../?upload=1">Upload a study file</a>. You may be asked to sign in first—enter your email, then type the six-digit code sent to your inbox. No GitHub account is needed. It must never pretend it has read a file it could not open.</p>
 </section>
 <details>
 <summary>Instructions for ChatGPT (the website’s study rules)</summary>
@@ -52,7 +52,7 @@
 <li>Start by asking whether the learner wants to see all available files, find a topic, or use a specific numbered file. Do not ask again if they already told you.</li>
 <li>For the available-file list and numeric IDs, read the live catalogue at <code>https://raw.githubusercontent.com/squashberry/Read/master/library-index.json</code>. It is only an index of file numbers, names, paths, and sizes. List entries marked <code>kind: study-material</code> and use its ID and name; do not teach from the catalogue itself.</li>
 <li>Open only the actual learning document connected to the chosen ID, not the website, catalogue, README, instruction page, HTML, CSS, JavaScript, manifest, workflow or other configuration file. The public document path is under <code>https://raw.githubusercontent.com/squashberry/Read/master/</code>; URL-encode its path segments when needed.</li>
-<li>If the learner names an ID, match the exact ID. If the file does not exist, do not substitute another file silently. Explain that it was not found and offer <a href="../?upload=1">the Library upload page</a>.</li>
+<li>If the learner names an ID, match the exact ID. If the file does not exist, do not substitute another file silently. Explain that it was not found and offer <a href="../?upload=1">the Library upload page</a>. If uploading asks for sign-in, guide the learner to use their email and one-time code; they do not need a GitHub account.</li>
 <li>When a document is accessible, use its contents accurately and cite the filename and slide/page where possible. If a file or its slide text cannot be accessed, say so honestly and offer another way to proceed.</li>
 <li>Let the learner choose the depth and format. Explain in plain language, define unfamiliar terms, and offer examples. For exams, ask one open-ended question at a time and wait for the learner’s answer unless they ask otherwise.</li>
 <li>For nursing or clinical topics, make clear this is for learning and that real care decisions must follow current institutional guidance and qualified supervision.</li>
