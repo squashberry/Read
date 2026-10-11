@@ -4,26 +4,41 @@ const BRANCH = "master";
 const ALLOWED_ORIGIN = "https://squashberry.github.io";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 4;
-const DAILY_FILE_LIMIT = 10;
+const DAILY_IP_FILE_LIMIT = 10;
+const DAILY_USER_FILE_LIMIT = 20;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
+const LOGIN_CODE_TTL_SECONDS = 10 * 60;
 
-function json(data, status = 200, origin = ALLOWED_ORIGIN) {
+function response(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "access-control-allow-origin": origin,
-      "access-control-allow-methods": "POST, OPTIONS",
-      "access-control-allow-headers": "content-type",
-      "vary": "Origin"
+      "access-control-allow-origin": ALLOWED_ORIGIN,
+      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type",
+      "vary": "Origin",
+      "x-content-type-options": "nosniff"
     }
   });
 }
 function safeName(name) {
-  return String(name || "study-file").normalize("NFKC").replace(/[\\/]/g, "-").replace(/[^\p{L}\p{N}._ ()-]/gu, "_").replace(/\s+/g, " ").trim().slice(0, 120) || "study-file";
+  return String(name || "study-file").normalize("NFKC")
+    .replace(/[\\/]/g, "-")
+    .replace(/[^\p{L}\p{N}._ ()-]/gu, "_")
+    .replace(/\s+/g, " ").trim().slice(0, 120) || "study-file";
 }
 function extension(name) { return (String(name).split(".").pop() || "").toLowerCase(); }
+function cleanText(value, max = 80) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
+}
+function emailLooksValid(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254; }
+function randomHex(length = 32) {
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
 function decodeUtf8Base64(value) {
   const binary = atob(String(value || "").replace(/\s/g, ""));
   const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
@@ -34,139 +49,328 @@ function bytesToBase64(bytes) {
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
 }
-async function gh(path, token, init = {}) {
-  const response = await fetch("https://api.github.com/repos/" + OWNER + "/" + REPO + path, {
+async function sha256Hex(value) {
+  const data = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+}
+async function hmacHex(secret, value) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), {name:"HMAC",hash:"SHA-256"}, false, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(signature), b => b.toString(16).padStart(2, "0")).join("");
+}
+function timingSafeEqual(a, b) {
+  a = String(a || "");
+  b = String(b || "");
+  let diff = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let i = 0; i < length; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+async function rateLimit(env, key, limit, ttlSeconds, increment = 1) {
+  const current = Number(await env.UPLOAD_RATE_LIMIT.get(key) || 0);
+  if (current + increment > limit) return false;
+  await env.UPLOAD_RATE_LIMIT.put(key, String(current + increment), {expirationTtl: ttlSeconds});
+  return true;
+}
+function ipOf(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
+async function verifyTurnstile(token, ip, secret) {
+  if (!token || !secret) return false;
+  const body = new URLSearchParams({secret, response:token});
+  if (ip && ip !== "unknown") body.set("remoteip", ip);
+  try {
+    const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {method:"POST",body}).then(r => r.json());
+    return result.success === true && result.hostname === "squashberry.github.io";
+  } catch { return false; }
+}
+async function requestJson(request) {
+  try { return await request.json(); }
+  catch { throw new Error("The request was not valid JSON."); }
+}
+async function githubRequest(path, token, init = {}) {
+  const result = await fetch("https://api.github.com/repos/" + OWNER + "/" + REPO + path, {
     ...init,
     headers: {
-      "accept": "application/vnd.github+json",
-      "authorization": "Bearer " + token,
-      "x-github-api-version": "2022-11-28",
+      "accept":"application/vnd.github+json",
+      "authorization":"Bearer " + token,
+      "x-github-api-version":"2022-11-28",
       ...(init.headers || {})
     }
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const error = new Error("Storage service returned " + response.status + (body.message ? ": " + body.message : ""));
-    error.status = response.status;
+  const body = await result.json().catch(() => ({}));
+  if (!result.ok) {
+    const error = new Error("Repository service returned " + result.status + (body.message ? ": " + body.message : ""));
+    error.status = result.status;
     throw error;
   }
   return body;
 }
 async function readCatalogue(token) {
-  const registry = await gh("/contents/library-index.json?ref=" + BRANCH, token);
-  const catalogue = JSON.parse(decodeUtf8Base64(registry.content));
+  const file = await githubRequest("/contents/library-index.json?ref=" + BRANCH, token);
+  const catalogue = JSON.parse(decodeUtf8Base64(file.content));
   if (!Array.isArray(catalogue.items)) throw new Error("The numbered file catalogue is invalid.");
-  return {registry,catalogue};
+  return {file,catalogue};
 }
-async function saveCatalogue(catalogue, token, sha, message) {
-  return gh("/contents/library-index.json", token, {
-    method:"PUT",
-    headers:{"content-type":"application/json"},
-    body:JSON.stringify({
-      message,
-      content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),
-      sha,
-      branch:BRANCH
-    })
-  });
+async function allocateFileId(env, token) {
+  const {catalogue} = await readCatalogue(token);
+  const maxId = Math.max(0, ...catalogue.items.map(item => Number.parseInt(item.id,10) || 0));
+  await env.DB.prepare("INSERT INTO id_counters (name, next_id) VALUES ('study-files', ?) ON CONFLICT(name) DO UPDATE SET next_id = MAX(id_counters.next_id, excluded.next_id)")
+    .bind(maxId + 1).run();
+  const row = await env.DB.prepare("UPDATE id_counters SET next_id = next_id + 1 WHERE name = 'study-files' RETURNING next_id - 1 AS allocated_id").first();
+  if (!row) throw new Error("Could not reserve a unique file number.");
+  return String(row.allocated_id).padStart(3, "0");
 }
-async function reserveEntry(filename, size, token) {
-  for (let attempt=0; attempt<5; attempt++) {
-    const {registry,catalogue} = await readCatalogue(token);
-    const next = Math.max(0, ...catalogue.items.map(item => Number.parseInt(item.id,10) || 0)) + 1;
-    const id = String(next).padStart(3,"0");
-    const entry = {id,name:filename,path:id+" - "+filename,size,kind:"upload-pending",uploadedAt:new Date().toISOString()};
-    catalogue.items.push(entry);
-    catalogue.items.sort((a,b) => Number(a.id)-Number(b.id));
-    try {
-      const result = await saveCatalogue(catalogue,token,registry.sha,"Reserve study file ID "+id);
-      return {entry,sha:result.content.sha};
-    } catch (error) {
-      if (error && (error.status===409 || error.status===422) && attempt<4) continue;
-      throw error;
+async function registerCatalogueEntry(entry, token) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const {file,catalogue} = await readCatalogue(token);
+    const sameId = catalogue.items.find(item => String(item.id).padStart(3,"0") === entry.id);
+    if (sameId) {
+      if (sameId.path === entry.path && sameId.kind === "study-material") return;
+      throw new Error("The reserved file number is already in use. The file was uploaded but its catalogue entry needs owner review.");
     }
-  }
-  throw new Error("The file number could not be reserved. Please try again.");
-}
-async function publishEntry(id, token) {
-  for (let attempt=0; attempt<5; attempt++) {
-    const {registry,catalogue} = await readCatalogue(token);
-    const entry = catalogue.items.find(item => String(item.id).padStart(3,"0") === String(id).padStart(3,"0"));
-    if (!entry) throw new Error("The reserved file number is missing from the catalogue.");
-    if (entry.kind === "study-material") return;
-    entry.kind = "study-material";
+    catalogue.items.push(entry);
+    catalogue.items.sort((a,b) => Number(a.id) - Number(b.id));
     try {
-      await saveCatalogue(catalogue,token,registry.sha,"Publish study file "+id);
+      await githubRequest("/contents/library-index.json", token, {
+        method:"PUT",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          message:"Register study file " + entry.id + " - " + entry.name,
+          content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),
+          sha:file.sha,
+          branch:BRANCH
+        })
+      });
       return;
     } catch (error) {
-      if (error && (error.status===409 || error.status===422) && attempt<4) continue;
+      if (error && (error.status === 409 || error.status === 422) && attempt < 5) continue;
       throw error;
     }
   }
-  throw new Error("The uploaded file could not be published in the catalogue. Please retry or contact the Library owner.");
+  throw new Error("Could not save the file catalogue after several attempts. Please retry.");
 }
-async function verifyTurnstile(token, ip, secret) {
-  const body = new URLSearchParams({secret, response: token});
-  if (ip) body.set("remoteip", ip);
-  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {method:"POST", body});
-  if (!response.ok) return false;
-  const result = await response.json();
-  return result.success === true && result.hostname === "squashberry.github.io";
+async function getSessionUser(request, env) {
+  const header = request.headers.get("Authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (!token || !env.DB) return null;
+  const tokenHash = await sha256Hex(token);
+  const now = Math.floor(Date.now()/1000);
+  return env.DB.prepare(
+    "SELECT u.id, u.email, u.display_name, u.created_at, u.updated_at, s.expires_at " +
+    "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?"
+  ).bind(tokenHash, now).first();
+}
+function publicUser(user) {
+  return {id:user.id,email:user.email,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at,sessionExpiresAt:user.expires_at};
+}
+async function sendLoginCode(email, code, env) {
+  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) throw new Error("Sign-in email is not configured. The Library owner needs to finish the Cloudflare email setup.");
+  const result = await fetch("https://api.resend.com/emails", {
+    method:"POST",
+    headers:{"authorization":"Bearer "+env.RESEND_API_KEY,"content-type":"application/json"},
+    body:JSON.stringify({
+      from:env.EMAIL_FROM,
+      to:[email],
+      subject:"Your Squashberry Library sign-in code",
+      text:"Your Squashberry Library sign-in code is "+code+". It expires in 10 minutes. If you did not request this code, you can ignore this email.",
+      html:'<div style="font-family:Arial,sans-serif;color:#34251c;max-width:520px;margin:auto;padding:26px"><p style="font-size:12px;letter-spacing:2px;color:#80583f;font-weight:bold">SQUASHBERRY LIBRARY</p><h1 style="font-size:25px">Your sign-in code</h1><p>Enter this one-time code on the sign-in screen to open your personal Library dashboard.</p><div style="font-size:34px;letter-spacing:8px;font-weight:bold;background:#fbf4ed;padding:20px;border-radius:14px;text-align:center">'+code+'</div><p>This code expires in 10 minutes and can only be used once. If you did not request it, ignore this email.</p><p style="font-size:12px;color:#806f60">Your study files uploaded to the public Library repository can be seen and downloaded by anyone.</p></div>'
+    })
+  });
+  const body = await result.json().catch(() => ({}));
+  if (!result.ok) throw new Error("Email delivery failed. Please check the sign-in email settings. " + cleanText(body.message,180));
+}
+async function handleRequestCode(request, env) {
+  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.AUTH_CODE_SECRET) return response({error:"Personal Library sign-in is not configured yet."},503);
+  const body = await requestJson(request);
+  const email = cleanText(body.email,254).toLowerCase();
+  const displayName = cleanText(body.displayName,50);
+  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
+  if (!await verifyTurnstile(body.captcha, ipOf(request), env.TURNSTILE_SECRET_KEY)) {
+    return response({error:"Please complete the human-check box, then try again."},400);
+  }
+  const emailKey = "login-email:" + await sha256Hex(email);
+  const ipKey = "login-ip:" + await sha256Hex(ipOf(request));
+  if (!await rateLimit(env,emailKey,3,900)) return response({error:"Too many codes requested for this email. Please wait 15 minutes."},429);
+  if (!await rateLimit(env,ipKey,12,3600)) return response({error:"Too many sign-in attempts from this connection. Try again later."},429);
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6,"0");
+  const now = Math.floor(Date.now()/1000);
+  const codeHash = await hmacHex(env.AUTH_CODE_SECRET,email+"|"+code);
+  await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now,email).run();
+  await env.DB.prepare(
+    "INSERT INTO login_codes (id,email,code_hash,desired_name,expires_at,attempts,created_at,used_at) VALUES (?,?,?,?,?,0,?,NULL)"
+  ).bind(crypto.randomUUID(),email,codeHash,displayName,now+LOGIN_CODE_TTL_SECONDS,now).run();
+  try {
+    await sendLoginCode(email,code,env);
+  } catch (error) {
+    await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now,email).run();
+    return response({error:cleanText(error.message,240) || "Could not send the email. Please try again later."},502);
+  }
+  return response({ok:true,message:"A six-digit sign-in code is on its way. Check your inbox and spam folder.",expiresIn:LOGIN_CODE_TTL_SECONDS});
+}
+async function handleVerifyCode(request, env) {
+  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.AUTH_CODE_SECRET) return response({error:"Personal Library sign-in is not configured yet."},503);
+  const body = await requestJson(request);
+  const email = cleanText(body.email,254).toLowerCase();
+  const code = cleanText(body.code,10);
+  if (!emailLooksValid(email) || !/^\d{6}$/.test(code)) return response({error:"Enter the same email address and the six-digit code."},400);
+  const ipKey = "verify-ip:" + await sha256Hex(ipOf(request));
+  if (!await rateLimit(env,ipKey,20,3600)) return response({error:"Too many attempts. Please try again later."},429);
+  const now = Math.floor(Date.now()/1000);
+  const row = await env.DB.prepare("SELECT id, code_hash, desired_name, expires_at, attempts FROM login_codes WHERE email = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1").bind(email,now).first();
+  if (!row || row.attempts >= 5) return response({error:"That code has expired or is no longer available. Request a new code."},400);
+  const receivedHash = await hmacHex(env.AUTH_CODE_SECRET,email+"|"+code);
+  if (!timingSafeEqual(receivedHash,row.code_hash)) {
+    await env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND used_at IS NULL").bind(row.id).run();
+    return response({error:"That code does not match. Check the email and try again."},400);
+  }
+  const used = await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND attempts < 5 AND expires_at > ?").bind(now,row.id,now).run();
+  if (!used.meta || used.meta.changes !== 1) return response({error:"That code was already used or has expired. Request a new one."},400);
+  const existing = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE email = ?").bind(email).first();
+  let user = existing;
+  if (!user) {
+    const name = row.desired_name || cleanText(email.split("@")[0],50) || "Student";
+    const id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO users (id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id,email,name,now,now).run();
+    user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+    await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
+  }
+  const sessionToken = randomHex(32);
+  const tokenHash = await sha256Hex(sessionToken);
+  const expiresAt = now + SESSION_TTL_SECONDS;
+  await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,created_at,expires_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,tokenHash,now,expiresAt).run();
+  return response({ok:true,token:sessionToken,expiresAt,user:publicUser({...user,expires_at:expiresAt})});
+}
+async function handleMe(request, env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Please sign in to your personal Library again."},401);
+  if (request.method === "GET") return response({ok:true,user:publicUser(user)});
+  if (request.method === "PATCH") {
+    const body = await requestJson(request);
+    const name = cleanText(body.displayName,50);
+    if (name.length < 2) return response({error:"Your display name must be at least two characters."},400);
+    const now = Math.floor(Date.now()/1000);
+    await env.DB.prepare("UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?").bind(name,now,user.id).run();
+    const changed = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,? AS expires_at FROM users WHERE id = ?").bind(user.expires_at,user.id).first();
+    return response({ok:true,user:publicUser(changed)});
+  }
+  return response({error:"Method not allowed."},405);
+}
+async function handleDashboard(request, env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Please sign in to your personal Library again."},401);
+  const summary = await env.DB.prepare("SELECT COUNT(*) AS file_count, COALESCE(SUM(file_size),0) AS total_bytes FROM uploads WHERE user_id = ?").bind(user.id).first();
+  const uploads = await env.DB.prepare("SELECT file_id,file_name,file_path,file_size,created_at FROM uploads WHERE user_id = ? ORDER BY created_at DESC LIMIT 12").bind(user.id).all();
+  const activity = await env.DB.prepare("SELECT kind,detail,created_at FROM activity WHERE user_id = ? ORDER BY created_at DESC LIMIT 8").bind(user.id).all();
+  return response({
+    ok:true,
+    stats:{fileCount:Number(summary.file_count||0),totalBytes:Number(summary.total_bytes||0)},
+    uploads:(uploads.results||[]).map(row=>({id:String(row.file_id).padStart(3,"0"),name:row.file_name,path:row.file_path,size:Number(row.file_size||0),createdAt:row.created_at})),
+    activity:(activity.results||[]).map(row=>({kind:row.kind,detail:row.detail,createdAt:row.created_at}))
+  });
+}
+async function handleActivity(request, env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Please sign in again."},401);
+  const body = await requestJson(request);
+  const allowed = new Set(["opened-file","started-study","viewed-library","copied-prompt"]);
+  const kind = cleanText(body.kind,32);
+  const detail = cleanText(body.detail,180);
+  if (!allowed.has(kind)) return response({error:"That activity type is not supported."},400);
+  const now = Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,kind,detail||kind,now).run();
+  return response({ok:true});
+}
+async function handleLogout(request, env) {
+  const header = request.headers.get("Authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (token && env.DB) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
+  return response({ok:true});
+}
+async function handleUpload(request, env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Sign in to your personal Library before uploading files."},401);
+  if (!env.GITHUB_TOKEN || !env.TURNSTILE_SECRET_KEY || !env.UPLOAD_RATE_LIMIT || !env.DB) {
+    return response({error:"The secure upload service is not fully configured yet."},503);
+  }
+  const ip = ipOf(request);
+  let form;
+  try { form = await request.formData(); }
+  catch { return response({error:"The upload form could not be read. Please try again."},400); }
+  if (!await verifyTurnstile(form.get("cf-turnstile-response"),ip,env.TURNSTILE_SECRET_KEY)) {
+    return response({error:"Please complete the human-check box, then try again."},400);
+  }
+  const uploads = form.getAll("files").filter(item => item && typeof item.arrayBuffer === "function");
+  if (!uploads.length || uploads.length > MAX_FILES_PER_REQUEST) {
+    return response({error:"Choose between one and "+MAX_FILES_PER_REQUEST+" study files at a time."},400);
+  }
+  for (const file of uploads) {
+    if (!ALLOWED_EXTENSIONS.has(extension(file.name))) return response({error:"Unsupported file type: "+safeName(file.name)},400);
+    if (file.size <= 0 || file.size > MAX_FILE_BYTES) return response({error:"Each file must be smaller than 8 MB: "+safeName(file.name)},413);
+  }
+  const today = new Date().toISOString().slice(0,10);
+  const ipKey = "upload-ip:"+await sha256Hex(ip)+":"+today;
+  const userKey = "upload-user:"+user.id+":"+today;
+  if (!await rateLimit(env,ipKey,DAILY_IP_FILE_LIMIT,86400,uploads.length)) {
+    return response({error:"This connection has reached its daily upload limit. Please try again tomorrow."},429);
+  }
+  if (!await rateLimit(env,userKey,DAILY_USER_FILE_LIMIT,86400,uploads.length)) {
+    return response({error:"Your personal Library has reached today's upload limit. Try again tomorrow."},429);
+  }
+  const uploaded = [];
+  try {
+    for (const file of uploads) {
+      const filename = safeName(file.name);
+      const id = await allocateFileId(env,env.GITHUB_TOKEN);
+      const path = id+" - "+filename;
+      const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await githubRequest("/contents/"+encodedPath,env.GITHUB_TOKEN,{
+        method:"PUT",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({message:"Upload study material "+id+" - "+filename,content:bytesToBase64(bytes),branch:BRANCH})
+      });
+      const entry = {id,name:filename,path,size:file.size,kind:"study-material",uploadedAt:new Date().toISOString()};
+      await registerCatalogueEntry(entry,env.GITHUB_TOKEN);
+      const now = Math.floor(Date.now()/1000);
+      await env.DB.prepare("INSERT INTO uploads (id,user_id,file_id,file_name,file_path,file_size,created_at) VALUES (?,?,?,?,?,?,?)")
+        .bind(crypto.randomUUID(),user.id,id,filename,path,file.size,now).run();
+      await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)")
+        .bind(crypto.randomUUID(),user.id,"uploaded-file","Uploaded "+filename+" (file "+id+")",now).run();
+      uploaded.push({id,name:filename,path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
+    }
+    return response({ok:true,files:uploaded});
+  } catch (error) {
+    return response({error:"The upload could not be completed: "+cleanText(error && error.message,220)},502);
+  }
 }
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
-    if (origin !== ALLOWED_ORIGIN) return json({error:"This upload page is not allowed to use the service."}, 403, ALLOWED_ORIGIN);
-    if (request.method === "OPTIONS") return new Response(null, {status:204, headers:{
-      "access-control-allow-origin": ALLOWED_ORIGIN,
-      "access-control-allow-methods": "POST, OPTIONS",
-      "access-control-allow-headers": "content-type",
-      "access-control-max-age": "86400",
+    if (origin !== ALLOWED_ORIGIN) return response({error:"This website is not allowed to use the personal Library service."},403);
+    if (request.method === "OPTIONS") return new Response(null,{status:204,headers:{
+      "access-control-allow-origin":ALLOWED_ORIGIN,
+      "access-control-allow-methods":"GET, POST, PATCH, OPTIONS",
+      "access-control-allow-headers":"authorization, content-type",
+      "access-control-max-age":"86400",
       "vary":"Origin"
     }});
-    if (request.method !== "POST") return json({error:"Use POST to upload study files."}, 405);
-    if (!env.GITHUB_TOKEN || !env.TURNSTILE_SECRET_KEY || !env.UPLOAD_RATE_LIMIT) {
-      return json({error:"The upload service is not fully configured yet."}, 503);
-    }
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-    const today = new Date().toISOString().slice(0,10);
-    const rateKey = "upload:" + ip + ":" + today;
-    const used = Number(await env.UPLOAD_RATE_LIMIT.get(rateKey) || 0);
-    if (used >= DAILY_FILE_LIMIT) return json({error:"This connection has reached today’s upload limit. Try again tomorrow."}, 429);
-    let form;
-    try { form = await request.formData(); }
-    catch { return json({error:"The upload form was not readable."}, 400); }
-    const captcha = form.get("cf-turnstile-response");
-    if (typeof captcha !== "string" || !(await verifyTurnstile(captcha, ip, env.TURNSTILE_SECRET_KEY))) {
-      return json({error:"Please complete the human check and try again."}, 400);
-    }
-    const uploads = form.getAll("files").filter(item => item && typeof item.arrayBuffer === "function");
-    if (!uploads.length || uploads.length > MAX_FILES_PER_REQUEST) return json({error:"Choose between 1 and " + MAX_FILES_PER_REQUEST + " files per upload."}, 400);
-    for (const file of uploads) {
-      if (!ALLOWED_EXTENSIONS.has(extension(file.name))) return json({error:"Unsupported file type: " + safeName(file.name)}, 400);
-      if (file.size <= 0 || file.size > MAX_FILE_BYTES) return json({error:"Each file must be smaller than 8 MB: " + safeName(file.name)}, 413);
-    }
-    const uploaded = [];
+    const url = new URL(request.url);
+    const path = url.pathname.replace(/\/+$/,"") || "/";
     try {
-      // Count attempts before writing so failed requests cannot bypass the daily limit.
-      await env.UPLOAD_RATE_LIMIT.put(rateKey, String(used + uploads.length), {expirationTtl: 86400});
-      for (const file of uploads) {
-        const filename = safeName(file.name);
-        const {entry} = await reserveEntry(filename,file.size,env.GITHUB_TOKEN);
-        const id = entry.id;
-        const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        await gh("/contents/" + encodedPath, env.GITHUB_TOKEN, {
-          method:"PUT",
-          headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Upload study material " + id + " - " + filename,content:bytesToBase64(bytes),branch:BRANCH})
-        });
-        await publishEntry(id,env.GITHUB_TOKEN);
-        uploaded.push({id,name:filename,path:entry.path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
+      if (path === "/health" && request.method === "GET") {
+        const configured = Boolean(env.DB && env.UPLOAD_RATE_LIMIT && env.AUTH_CODE_SECRET && env.RESEND_API_KEY && env.EMAIL_FROM && env.GITHUB_TOKEN && env.TURNSTILE_SECRET_KEY);
+        return response({ok:true,service:"squashberry-library-api",configured});
       }
-      return json({ok:true,files:uploaded});
+      if (path === "/auth/request-code" && request.method === "POST") return await handleRequestCode(request,env);
+      if (path === "/auth/verify-code" && request.method === "POST") return await handleVerifyCode(request,env);
+      if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
+      if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
+      if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
+      if (path === "/auth/logout" && request.method === "POST") return await handleLogout(request,env);
+      if (path === "/upload" && request.method === "POST") return await handleUpload(request,env);
+      return response({error:"This Library API route was not found."},404);
     } catch (error) {
-      return json({error:"The upload could not be completed: " + String(error && error.message || error)}, 502);
+      return response({error:"The request could not be completed: "+cleanText(error && error.message,200)},500);
     }
   }
 };
