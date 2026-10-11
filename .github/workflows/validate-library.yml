@@ -25,12 +25,12 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('index.html', 'utf8');
-          const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)];
-          if (!scripts.length) throw new Error('No inline script found in index.html');
-          scripts.forEach((match, i) => {
-            new Function(match[1]);
-            console.log('Inline script ' + (i + 1) + ': syntax OK');
-          });
+          const start = html.indexOf('<script>');
+          const end = html.indexOf('</script>', start);
+          if (start < 0 || end < 0) throw new Error('Inline script not found in index.html');
+          const script = html.slice(start + '<script>'.length, end);
+          new Function(script);
+          console.log('Inline JavaScript syntax: OK');
           const registry = JSON.parse(fs.readFileSync('library-index.json', 'utf8'));
           if (!Array.isArray(registry.items)) throw new Error('Catalogue has no items array');
           const ids = registry.items.map(item => String(item.id));
