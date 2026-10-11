@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   display_name TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  welcome_email_sent_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS login_codes (
