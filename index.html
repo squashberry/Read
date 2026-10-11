@@ -317,7 +317,7 @@ const niceName=name=>name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").replace(/
 const esc=value=>String(value).replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const iconFor=ext=>({pdf:"PDF",pptx:"PPT",ppt:"PPT",docx:"DOC",doc:"DOC",xlsx:"XLS",txt:"TXT",md:"MD",rtf:"TXT"}[ext]||ext.toUpperCase().slice(0,4)||"FILE");
 function toast(message){$("toast").textContent=message;$("toast").classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>$("toast").classList.remove("show"),2800)}
-function applyTheme(){document.body.classList.toggle("light",state.theme==="light");$("themeBtn").textContent=state.theme==="light"?"☾":"☼";document.querySelector('meta[name="theme-color"]').content=state.theme==="light"?"#f7f3ee":"#211811"}
+function applyTheme(){document.body.classList.toggle("light",state.theme==="light");$("themeBtn").textContent=state.theme==="light"?"☾":"☼";document.querySelector('meta[name="theme-color"]').content=state.theme==="light"?"#fbf8f4":"#211811"}
 function hideSplash(){setTimeout(()=>$("splash").classList.add("done"),1250)}
 function openChat(prompt){const url="https://chatgpt.com/?q="+encodeURIComponent(prompt);window.open(url,"_blank","noopener,noreferrer")}
 function basePrompt(){return "Let’s study using SquashberryLibrary. Read what "+INSTRUCTION_URL+" says and let’s get started."}
@@ -476,6 +476,7 @@ async function signOutAccount(){
  clearAccountSession();renderAccountPanel();toast("You’re signed out. Your public study files remain available.");
 }
 function openAuthModal(){
+ if(!apiConfigured())authState.afterAuthAction=null;
  $("modalKicker").textContent="YOUR PERSONAL LIBRARY";$("modalTitle").textContent="Sign in to your Library";$("modalDescription").textContent="We’ll email you a one-time code. No password and no GitHub account needed.";
  if(!apiConfigured()){
   $("modalBody").innerHTML='<div class="auth-config-note"><b>Almost ready.</b><br>Personal sign-in is prepared, but the Cloudflare service URL and public Turnstile site key still need to be set by the Library owner. You can browse the study files in the meantime.</div><div class="modal-actions"><button class="outline-btn" id="authClose">Close</button><a class="outline-btn" href="https://github.com/squashberry/Read/tree/master/upload-worker" target="_blank" rel="noopener">Setup guide ↗</a></div>';
