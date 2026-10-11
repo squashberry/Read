@@ -1,25 +1,77 @@
-# Tokenless Library uploads (Cloudflare Worker)
+# Personal Library authentication and uploads (Cloudflare)
 
-This adds a small server-side upload endpoint so classmates do **not** need GitHub accounts or personal access tokens. A server-side GitHub token is still required, but it is stored as a Cloudflare Worker secret and is never sent to the browser.
+This Worker powers email-code sign-in, a personal upload dashboard, and file uploads without asking students to create GitHub accounts or paste GitHub tokens. The private credentials stay on Cloudflare's server side. Sign-in codes are sent through Resend.
 
-## One-time setup
+**Important:** these files are the backend source/setup guide, not a deployed live service. The account and account-only upload UI will stay in setup mode until the Worker, bindings and public config are completed.
 
-1. In Cloudflare, create a Turnstile widget and allow the hostname `squashberry.github.io`. Copy its **site key** and **secret key**.
-2. Create a KV namespace (for example, `LIBRARY_UPLOAD_RATE_LIMIT`).
-3. Create a Cloudflare Worker named `squashberry-library-upload` and paste in `worker.js`.
-4. Add Worker secret `GITHUB_TOKEN`: a fine-grained personal access token restricted to `squashberry/Read` with **Contents: Read and write**. Add Worker secret `TURNSTILE_SECRET_KEY` with the Turnstile secret. Bind the KV namespace to the Worker using the variable name `UPLOAD_RATE_LIMIT`.
-5. Set the Turnstile site key on the website in `upload-config.js`, and set `endpoint` to the exact deployed Worker URL, for example `https://squashberry-library-upload.<your-workers-subdomain>.workers.dev`. The example is a pattern—use the URL shown by your own Cloudflare account.
-6. Save the file. GitHub Pages will publish it. Test by uploading one harmless PDF, then verify that a new numbered entry appears in `library-index.json`.
+## What students get
 
-## Safety limits in this starter
+- Sign in or create an account with an email address and a six-digit, one-time code.
+- No password or GitHub account is needed for students.
+- Their email, display name, session, uploads and recent activity are stored in Cloudflare D1.
+- Uploads are accepted only from signed-in sessions and are protected with Cloudflare Turnstile.
+- Rate limits: 8 MB per file, up to four files per upload, up to 20 files per user per UTC day, and an IP-level daily limit.
+- Sessions expire after 14 days. Only a hash of the session token is stored in D1.
 
-- Only requests from the GitHub Pages origin are accepted.
-- Cloudflare Turnstile must pass.
-- The server accepts only PDF, PowerPoint, Word and text file extensions.
-- Each file is limited to 8 MB; up to four files per request.
-- The KV counter limits each IP address to 10 uploaded files per UTC day.
-- Files added to this repo are public. Do not upload confidential or patient-identifying materials.
+## One-time Cloudflare setup
 
-## Important operational note
+### 1. Create the D1 database
 
-This is a deployable Worker source file, not a live hosted endpoint. Until the Worker has been created in Cloudflare and its URL plus Turnstile site key are placed in `upload-config.js`, the current token-based upload remains the fallback. Do not put `GITHUB_TOKEN` or `TURNSTILE_SECRET_KEY` in `upload-config.js`, HTML, or any public file.
+In Cloudflare Dashboard, open **Workers & Pages → D1 SQL Database**, create a database such as `squashberry-library`, open its SQL console, and run the contents of `schema.sql`.
+
+The schema defines `users`, `login_codes`, `sessions`, `uploads`, `activity` and an atomic `id_counters` table.
+
+### 2. Create the rate-limit KV namespace
+
+Open **Workers & Pages → KV**, create a namespace (for example `LIBRARY_UPLOAD_RATE_LIMIT`). The exact name can differ, but the Worker binding name must be `UPLOAD_RATE_LIMIT`.
+
+### 3. Create the Turnstile widget
+
+Open Cloudflare **Turnstile**, create a widget allowing the hostname `squashberry.github.io`, and save its **site key** and **secret key** separately. The site key is public; the secret key is not.
+
+### 4. Set up email delivery
+
+Sign-in codes are emailed through Resend's API. In Resend, verify a sender domain and choose a sender address allowed by that verified domain (for example, `Squashberry Library <library@your-verified-domain.example>`). You will add the Resend API key as a Worker secret and the sender string as `EMAIL_FROM`.
+
+### 5. Create the Worker
+
+Create a Worker named `squashberry-library-api`. Copy `worker.js` into its editor and deploy it.
+
+Add these **bindings**:
+
+- D1 database binding: variable name `DB` → the database from step 1.
+- KV namespace binding: variable name `UPLOAD_RATE_LIMIT` → the namespace from step 2.
+
+Add these **Worker secrets** (not ordinary public website variables):
+
+- `GITHUB_TOKEN`: a fine-grained GitHub token restricted to repository `squashberry/Read` and permission **Contents: Read and write**. This is a server-side token owned by the Library operator; students never see it.
+- `TURNSTILE_SECRET_KEY`: Turnstile's secret key.
+- `AUTH_CODE_SECRET`: a long random secret used to protect one-time sign-in codes. Generate one locally with `openssl rand -hex 32`.
+- `RESEND_API_KEY`: the Resend key for sending sign-in codes.
+
+Add `EMAIL_FROM` as a Worker variable with the verified sender address. Keep secrets out of `worker.js`, `index.html`, `upload-config.js`, and Git history.
+
+### 6. Connect the static website
+
+After deployment, open the Worker's `workers.dev` URL shown by Cloudflare, for example:
+
+`https://squashberry-library-api.<your-workers-subdomain>.workers.dev`
+
+In the repository's public `upload-config.js`, set:
+
+- `endpoint` to the Worker's full base URL without a trailing slash.
+- `turnstileSiteKey` to the public Turnstile site key.
+
+Commit the updated file. Do **not** put the Turnstile secret, Resend key, GitHub token or auth-code secret in this public config. The Worker only accepts browser requests whose origin is `https://squashberry.github.io`.
+
+### 7. Verify it works
+
+Open `https://squashberry.github.io/Read/`, select **You → Sign in / Create account**, request a code, and check the inbox (including spam). Enter the six-digit code, then open **You** again to see the profile and dashboard. Try uploading one harmless test document and check that its ID appears in the Library catalogue and the account's recent uploads.
+
+For an initial backend check, open the Worker URL + `/health` from the page's browser console or make a request with the Library page origin. The health response reports whether required bindings/secrets appear configured.
+
+## Privacy and publishing warning
+
+The login, profile, uploads list and activity are user-specific. **The actual study files are still uploaded to the public `squashberry/Read` GitHub repository and are not private.** Anyone may download the file if they know or discover its URL. Do not upload confidential documents, patient-identifying information, passwords, keys, or any file you are not allowed to share.
+
+For truly private documents, move the files to private object storage (for example, Cloudflare R2) and design a separate, authenticated way to share document contents with ChatGPT. This GitHub-backed version keeps the learning documents publicly retrievable so the numbered-file study workflow can work.
