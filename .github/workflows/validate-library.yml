@@ -92,7 +92,7 @@ jobs:
             throw new Error('Upload Worker is missing AI-review or readable-transcript support');
           }
           const uploadHandlerStart = worker.indexOf('async function handleUpload(request, env) {');
-          const uploadHandlerEnd = worker.indexOf('\\nfunction base64UrlDecode(value)', uploadHandlerStart);
+          const uploadHandlerEnd = worker.indexOf('\nfunction base64UrlDecode(value)', uploadHandlerStart);
           if (uploadHandlerStart < 0 || uploadHandlerEnd < 0 || worker.slice(uploadHandlerStart, uploadHandlerEnd).includes('verifyTurnstile')) {
             throw new Error('File uploads must not require the sign-in Turnstile widget');
           }
