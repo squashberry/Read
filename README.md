@@ -19,7 +19,9 @@ Squashberry Library is a mobile-first study web app for keeping learning materia
 
 The front end is designed for GitHub Pages at **https://squashberry.github.io/Read/**. In repository Settings → Pages, use branch `master` and folder `/(root)` if Pages has not already been enabled.
 
-The account API source is in `upload-worker/worker.js`, with its D1 schema in `upload-worker/schema.sql`. It must be deployed/configured once in Cloudflare. Until its URL and the public Turnstile site key are added to `upload-config.js`, the account panel displays a setup notice and uploads remain disabled. Follow `upload-worker/README.md` for setup instructions.
+The account API is deployed on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with a D1 database, KV rate-limit namespace, and a Turnstile widget restricted to `squashberry.github.io`. The public endpoint is connected in `upload-config.js` and its `/health` route has been verified from the site.
+
+**Two owner-only settings still block full sign-in/upload:** add a GitHub token as the Worker secret `GITHUB_TOKEN` (fine-grained, restricted to `squashberry/Read` with Contents read/write), and configure a verified sender domain for Resend then update the Worker variable `EMAIL_FROM`. Until these are done, the API is deployed but not fully operational. Never commit those credentials to this repository. See `upload-worker/README.md` for what remains.
 
 Authentication uses Cloudflare Worker + D1 sessions/data, Cloudflare Turnstile and Resend to deliver short-lived email codes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 
