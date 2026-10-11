@@ -64,7 +64,7 @@ async function saveCatalogue(catalogue, token, sha, message) {
     headers:{"content-type":"application/json"},
     body:JSON.stringify({
       message,
-      content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),
+      content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),
       sha,
       branch:BRANCH
     })
