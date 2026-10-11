@@ -21,7 +21,7 @@ The front end is designed for GitHub Pages at **https://squashberry.github.io/Re
 
 The account API is deployed on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with a D1 database, KV rate-limit namespace, and a Turnstile widget restricted to `squashberry.github.io`. The public endpoint is connected in `upload-config.js` and its `/health` route has been verified from the site.
 
-**Two owner-only settings still block full sign-in/upload:** add a GitHub token as the Worker secret `GITHUB_TOKEN` (fine-grained, restricted to `squashberry/Read` with Contents read/write), and configure a verified sender domain for Resend then update the Worker variable `EMAIL_FROM`. Until these are done, the API is deployed but not fully operational. Never commit those credentials to this repository. See `upload-worker/README.md` for what remains.
+**Two owner-only settings still need your attention:** (1) add a fine-grained GitHub token as the Worker secret `GITHUB_TOKEN`, restricted to `squashberry/Read` with Contents read/write, so uploads work; (2) verify a domain in Resend and change `EMAIL_FROM` to an address on that domain so sign-in and welcome emails can be delivered reliably. The existing auth, Turnstile, database, KV, and VAPID push secrets are already configured—do not add those again. Never commit secrets to this repository. See `upload-worker/README.md` for exact steps.
 
 Authentication uses Cloudflare Worker + D1 sessions/data, Cloudflare Turnstile and Resend to deliver short-lived email codes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 
