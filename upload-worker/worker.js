@@ -110,7 +110,7 @@ export default {
         const reservation = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
           method:"PUT",
           headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Reserve study file ID " + id,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),sha:reg.sha,branch:BRANCH})
+          body:JSON.stringify({message:"Reserve study file ID " + id,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),sha:reg.sha,branch:BRANCH})
         });
         reg = {sha:reservation.content.sha};
         const bytes = new Uint8Array(await file.arrayBuffer());
@@ -124,7 +124,7 @@ export default {
         const update = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
           method:"PUT",
           headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Publish study file " + id + " - " + filename,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),sha:reg.sha,branch:BRANCH})
+          body:JSON.stringify({message:"Publish study file " + id + " - " + filename,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),sha:reg.sha,branch:BRANCH})
         });
         reg = {sha:update.content.sha};
         uploaded.push({id,name:filename,path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
