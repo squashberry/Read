@@ -53,8 +53,11 @@ jobs:
             throw new Error('The ChatGPT instruction page is missing simple learner paths');
           }
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
-          const guideScript = guide.match(/<script>([\\s\\S]*?)<\\/script>/);
-          if (guideScript) new Function(guideScript[1]);
+          const guideScriptStart = guide.indexOf('<script>');
+          const guideScriptEnd = guide.indexOf('</script>', guideScriptStart);
+          if (guideScriptStart >= 0 && guideScriptEnd > guideScriptStart) {
+            new Function(guide.slice(guideScriptStart + '<script>'.length, guideScriptEnd));
+          }
           console.log('Readable study guide and links: OK');
 
           const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
