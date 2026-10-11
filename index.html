@@ -47,8 +47,10 @@
 "use strict";
 const OWNER="squashberry",REPO="Read",BRANCH="master";
 const API="https://api.github.com/repos/"+OWNER+"/"+REPO+"/contents?ref="+BRANCH;
+const REGISTRY_API="https://api.github.com/repos/"+OWNER+"/"+REPO+"/contents/library-index.json?ref="+BRANCH;
 const REPO_URL="https://github.com/"+OWNER+"/"+REPO;
-const files=[], state={filter:"all",query:"",selected:null,theme:localStorage.getItem("library-theme")||"dark",welcomeDone:localStorage.getItem("library-welcome")==="1",name:localStorage.getItem("library-name")||""};
+const files=[], manifest={version:1,repository:"squashberry/Read",items:[]}, state={filter:"all",query:"",selected:null,theme:localStorage.getItem("library-theme")||"dark",welcomeDone:localStorage.getItem("library-welcome")==="1",name:localStorage.getItem("library-name")||""};
+let registrySha=null;
 const $=id=>document.getElementById(id);
 const extOf=name=>(name.split(".").pop()||"").toLowerCase();
 const prettySize=bytes=>bytes<1024?bytes+" B":bytes<1048576?(bytes/1024).toFixed(0)+" KB":(bytes/1048576).toFixed(1)+" MB";
