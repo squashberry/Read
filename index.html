@@ -450,14 +450,21 @@ function uploadFinalFilename(item){
 }
 function renderUploadPreview(){
  const root=$("uploadFilePreview");if(!root)return;
- if(!uploadQueue.length){root.innerHTML='<div class="upload-empty">Choose PDF, PowerPoint, Word or text-based study files to preview them here.</div>';return}
+ if(!uploadQueue.length){root.innerHTML='<div class="upload-empty">Choose study files.</div>';return}
  root.innerHTML=uploadQueue.map((item,index)=>{
-  const status=item.review?(item.review.relevant===false?item.review.reason||"Not accepted as study material":item.review.aiReviewed?"AI reviewed · "+(item.review.reason||"Suitable for Library"):"Manual review · "+(item.review.reason||"Please confirm the file is relevant")):(item.reviewError||"Ready for review");
-  const statusClass=item.review&&item.review.relevant===false?"bad":item.review&&item.review.aiReviewed?"good":item.review&&item.review.manualReview?"manual":"";
-  const titleLabel="uploadTitle"+index;
-  return '<div class="upload-file-row" data-upload-index="'+index+'"><div class="upload-file-icon">'+esc(iconFor(extOf(item.file.name)))+'</div><div class="upload-file-main"><div class="upload-file-original">'+esc(item.file.name)+'</div><div class="upload-file-meta"><span>'+esc(prettySize(item.file.size))+'</span><span>·</span><span>'+esc(extOf(item.file.name).toUpperCase())+'</span></div><div class="upload-file-title"><label for="'+titleLabel+'">Library title</label><input class="upload-title-input" id="'+titleLabel+'" data-upload-title="'+index+'" value="'+esc(item.title)+'" maxlength="90" autocomplete="off"></div><p class="upload-file-status '+statusClass+'">'+esc(status)+'</p></div><button class="upload-file-remove" type="button" data-remove-upload="'+index+'" aria-label="Remove '+esc(item.file.name)+'">×</button></div>';
+  const status=item.aiFailed
+   ?"Squashberry couldn't generate a file title. Confirm this title."
+   :item.review?(item.review.relevant===false?item.review.reason||"Not accepted as study material":item.review.aiReviewed?"AI title ready":"Confirm this title")
+   :(item.reviewError||"Ready");
+  const statusClass=item.review&&item.review.relevant===false?"bad":item.review&&item.review.aiReviewed?"good":item.aiFailed||item.review&&item.review.manualReview?"manual":"";
+  const titleLabel=item.aiFailed?"Confirm file title":"File title";
+  const titleId="uploadTitle"+index;
+  return '<div class="upload-file-row" data-upload-index="'+index+'"><div class="upload-file-icon">'+esc(iconFor(extOf(item.file.name)))+'</div><div class="upload-file-main"><div class="upload-file-original">'+esc(item.file.name)+'</div><div class="upload-file-meta"><span>'+esc(prettySize(item.file.size))+'</span><span>·</span><span>'+esc(extOf(item.file.name).toUpperCase())+'</span></div><div class="upload-file-title"><label for="'+titleId+'">'+titleLabel+'</label><input class="upload-title-input" id="'+titleId+'" data-upload-title="'+index+'" value="'+esc(item.title)+'" maxlength="90" autocomplete="off"></div><p class="upload-file-status '+statusClass+'">'+esc(status)+'</p></div><button class="upload-file-remove" type="button" data-remove-upload="'+index+'" aria-label="Remove '+esc(item.file.name)+'">×</button></div>';
  }).join("");
- root.querySelectorAll("[data-upload-title]").forEach(input=>input.addEventListener("input",()=>{const item=uploadQueue[Number(input.dataset.uploadTitle)];if(item)item.title=input.value}));
+ root.querySelectorAll("[data-upload-title]").forEach(input=>input.addEventListener("input",()=>{
+  const item=uploadQueue[Number(input.dataset.uploadTitle)];if(item)item.title=input.value;
+  syncUploadButton();
+ }));
  root.querySelectorAll("[data-remove-upload]").forEach(button=>button.addEventListener("click",()=>{
   uploadQueue.splice(Number(button.dataset.removeUpload),1);
   uploadReviewDone=uploadQueue.length>0&&uploadQueue.every(item=>item.review&&item.review.relevant===true&&item.reviewToken);
@@ -467,9 +474,10 @@ function renderUploadPreview(){
 function syncUploadButton(){
  const button=$("uploadSubmit");if(!button)return;
  const rejected=uploadQueue.some(item=>item.review&&item.review.relevant===false);
- button.disabled=uploadDone||rejected||!uploadQueue.length;
- button.textContent=uploadDone?"Uploaded ✓":rejected?"Remove unrelated file(s) first":uploadReviewDone?"Upload approved files to Library ↥":"Review selected files with AI ✨";
- if($("uploadManualButton"))$("uploadManualButton").hidden=uploadDone||uploadReviewDone||rejected||!uploadManualAvailable;
+ const needsTitleConfirmation=uploadQueue.some(item=>item.aiFailed&&!item.titleConfirmed);
+ const emptyFallbackTitle=uploadQueue.some(item=>item.aiFailed&&!String(item.title||"").trim());
+ button.disabled=uploadDone||rejected||!uploadQueue.length||Boolean(needsTitleConfirmation&&emptyFallbackTitle);
+ button.textContent=uploadDone?"Uploaded ✓":rejected?"Remove unrelated file(s) first":needsTitleConfirmation?"Confirm title & upload":"Upload to Library ↥";
 }
 function setUploadProgress(message,percent,active=true){
  const region=$("uploadProcessing"),title=$("uploadProcessingTitle"),detail=$("uploadProcessingDetail"),bar=$("uploadProgressBar");
@@ -552,47 +560,55 @@ async function requestUploadReview(item,manual){
  const response=await fetch(apiBase()+"/upload/review",{method:"POST",headers:{Authorization:"Bearer "+authState.token,"Content-Type":"application/json"},body:JSON.stringify(body)});
  const data=await response.json().catch(()=>({}));
  if(!response.ok||!data.ok){
-  const error=new Error(data.error||"The AI review could not finish.");
+  const error=new Error(data.error||"The title review could not finish.");
   error.status=response.status;error.needsManual=data.needsManual===true||response.status===422||response.status===503;
   error.stage="review";error.apiStatus=response.status;
   throw error;
  }
  return data;
 }
-async function reviewSelectedUploads(manualMode){
- const progress=$("uploadProgress"),manualButton=$("uploadManualButton");
+async function reviewSelectedUploads(){
  let failed=false;
  for(let index=0;index<uploadQueue.length;index++){
   const item=uploadQueue[index];
   if(item.review&&item.review.relevant===false)continue;
   if(item.reviewToken&&item.review&&item.review.relevant===true)continue;
-  setUploadProgress((manualMode?"Checking your manual confirmation":"Reading file "+(index+1)+" of "+uploadQueue.length),Math.round(index/Math.max(1,uploadQueue.length)*55),true);
+  setUploadProgress("Reading file "+(index+1)+" of "+uploadQueue.length,Math.round(index/Math.max(1,uploadQueue.length)*55),true);
   try{
-   if(typeof item.text!=="string"){try{const extracted=await extractStudyText(item.file);item.text=extracted.text;item.extractionNote=extracted.note}catch(parseError){item.text="";item.extractionNote=String(parseError&&parseError.message||"Text extraction failed.")}}
+   if(typeof item.text!=="string"){
+    try{const extracted=await extractStudyText(item.file);item.text=extracted.text;item.extractionNote=extracted.note}
+    catch(parseError){item.text="";item.extractionNote=String(parseError&&parseError.message||"Text extraction failed.")}
+   }
    if(!item.fileHash)item.fileHash=await hashUploadFile(item.file);
-   const review=await requestUploadReview(item,manualMode);
+   let review;
+   try{review=await requestUploadReview(item,false)}
+   catch(aiError){
+    if(!aiError.needsManual)throw aiError;
+    review=await requestUploadReview(item,true);
+    item.aiFailed=true;item.titleConfirmed=false;
+   }
    if(typeof review.extractedText==="string")item.text=review.extractedText;
    item.review=review;item.reviewToken=review.reviewToken||"";
-   if(review.relevant===true){item.title=review.title||item.title;item.reviewError="";}
-   else{item.reviewToken="";item.reviewError=review.reason||"This file does not appear to be a study resource."}
+   if(review.relevant===true){
+    item.title=review.title||item.title;item.reviewError="";
+    if(review.manualReview&&!review.aiReviewed){item.aiFailed=true;item.titleConfirmed=false;}
+    else if(!item.aiFailed){item.titleConfirmed=true;}
+    if(item.aiFailed)item.reviewError="Squashberry couldn't generate a file title. Confirm this title.";
+   }else{
+    item.reviewToken="";item.reviewError=review.reason||"Not accepted as study material.";
+   }
   }catch(error){
    item.reviewError=error.message||"Review failed";failed=true;
-   if(manualButton&&error.needsManual){uploadManualAvailable=true;manualButton.hidden=false;}
-   if(progress)progress.textContent=item.file.name+": "+item.reviewError;
   }
   renderUploadPreview();
  }
  const rejected=uploadQueue.some(item=>item.review&&item.review.relevant===false);
  uploadReviewDone=!failed&&!rejected&&uploadQueue.length>0&&uploadQueue.every(item=>item.review&&item.review.relevant===true&&item.reviewToken);
- if(rejected){
-  setUploadProgress("One or more files were flagged as unrelated. Remove them to continue.",100,false);
-  if(progress)progress.textContent="Review complete. Remove any file marked unrelated before uploading.";
- }else if(failed){
-  setUploadProgress("Review could not finish for every file. Retry, or choose manual review below.",0,false);
-  if(manualButton){uploadManualAvailable=true;manualButton.hidden=false;}
- }else{
-  setUploadProgress(uploadQueue.some(item=>item.review&&item.review.manualReview)?"Manual review ready. Check each title and confirm that every file is a study resource.":"AI review complete. Check the suggested titles, then upload.",100,false);
- }
+ if(rejected)setUploadProgress("Remove files marked unrelated to study.",100,false);
+ else if(failed)setUploadProgress("Could not prepare every file. Try again.",0,false);
+ else if(uploadQueue.some(item=>item.aiFailed&&!item.titleConfirmed)){
+  setUploadProgress("Confirm the editable title to continue.",100,false);
+ }else setUploadProgress("Saving approved files…",90,true);
  syncUploadButton();
  return uploadReviewDone;
 }
@@ -615,37 +631,54 @@ function uploadWithProgress(form){
 }
 function openEasyUploadModal(cfg){
  uploadQueue=[];uploadReviewDone=false;uploadDone=false;uploadManualAvailable=false;
- $("modalKicker").textContent="ADD TO THE SHELVES";
- $("modalTitle").textContent="Upload your study files";
- $("modalDescription").textContent="Preview each file, review its suggested title, then add approved study material to Library.";
- $("modalBody").innerHTML='<div class="upload-form"><div class="prompt-card"><h3>Study-file intake</h3><p>Choose up to four PDF, PowerPoint, Word or text files. Each file is reviewed before being saved. Files added here are public, so never upload private records or patient-identifying information.</p></div><div><label for="uploadFiles">Choose learning materials (up to 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">Choose study files to see a preview here.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>I understand that files added to Library are <b>publicly accessible</b> and can be downloaded by anyone.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>I confirm these are genuine learning or educational resources. If AI review is unavailable, I will check each title and relevance myself.</span></label><div id="aiReviewInfo" class="upload-review-note"><strong>AI-assisted intake:</strong> when configured, Gemini checks whether a file belongs in this study library and suggests a topic-based title. Readable text is saved as a transcript so ChatGPT has an easier source to study.</div><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing your files…</strong><p id="uploadProcessingDetail">Your files stay in this window until the review finishes.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Review selected files with AI ✨</button><button class="outline-btn" id="uploadManualButton" type="button" hidden>Continue with manual review</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
+ $("modalKicker").textContent="ADD TO LIBRARY";
+ $("modalTitle").textContent="Upload study files";
+ $("modalDescription").textContent="Choose files. We’ll title them and add them to Library.";
+ $("modalBody").innerHTML='<div class="upload-form"><div><label for="uploadFiles">Study files (up to four, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">Choose study files.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>Files can be seen and downloaded by anyone.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are genuine study materials.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload to Library ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
  $("modalBackdrop").classList.add("show");
  $("cancelUpload").onclick=closeModal;
  $("uploadFiles").addEventListener("change",event=>{
-  uploadQueue=Array.from(event.target.files||[]).map(file=>({file,title:uploadDefaultTitle(file),text:undefined,fileHash:"",review:null,reviewToken:"",reviewError:""}));
-  uploadReviewDone=false;uploadDone=false;uploadManualAvailable=false;$("uploadResults").innerHTML="";$("uploadManualButton").hidden=true;
+  uploadQueue=Array.from(event.target.files||[]).map(file=>({file,title:uploadDefaultTitle(file),text:undefined,fileHash:"",review:null,reviewToken:"",reviewError:"",aiFailed:false,titleConfirmed:false}));
+  uploadReviewDone=false;uploadDone=false;$("uploadResults").innerHTML="";
   renderUploadPreview();syncUploadButton();
  });
- $("uploadSubmit").onclick=()=>handleEasyUpload(cfg,false);
- $("uploadManualButton").onclick=()=>handleEasyUpload(cfg,true);
+ $("uploadSubmit").onclick=()=>handleEasyUpload(cfg);
  renderUploadPreview();syncUploadButton();
 }
-async function handleEasyUpload(cfg,manualMode){
- const ack=$("publicAck"),studyAck=$("studyAck"),button=$("uploadSubmit"),progress=$("uploadProgress"),results=$("uploadResults");
+function buildUploadedFilesPrompt(uploaded){
+ const ids=uploaded.map(item=>String(item.id).padStart(3,"0"));
+ const sources=uploaded.map(item=>{
+  let entry="FILE "+String(item.id).padStart(3,"0")+" — "+item.name+"\nOriginal file: "+rawFileUrl(item.path);
+  if(item.transcriptPath)entry+="\nReadable transcript (primary text source): "+rawFileUrl(item.transcriptPath);
+  else entry+="\nNo readable transcript is registered; use the original file if your tools can open it.";
+  return entry;
+ });
+ return basePrompt()+"\n\nStudy all of these uploaded files together. File numbers: "+ids.map(id=>"#"+id).join(", ")+".\n\n"+sources.join("\n\n")+"\n\nUse the listed file URLs and the Library guide. Do not ask me to upload them again if you can access them. Explain how the topics connect, then help me study the material clearly and accurately.";
+}
+async function handleEasyUpload(cfg){
+ const ack=$("publicAck"),studyAck=$("studyAck"),button=$("uploadSubmit"),results=$("uploadResults");
  if(!uploadQueue.length){toast("Choose at least one study file.");return}
  if(uploadQueue.length>4){toast("Choose no more than four files at a time.");return}
- if(!ack.checked){toast("Please confirm that the files may be publicly accessible.");return}
- if(!studyAck.checked){toast("Confirm that these are learning or educational resources.");return}
+ if(!ack.checked){toast("Confirm that your files may be public.");return}
+ if(!studyAck.checked){toast("Confirm these are study materials.");return}
  if(uploadQueue.some(item=>item.file.size<=0||item.file.size>8*1024*1024)){toast("Each file must be smaller than 8 MB.");return}
  if(!authState.token||!authState.user){closeModal();authState.afterAuthAction="upload";openAuthModal();return}
- if(uploadQueue.some(item=>item.review&&item.review.relevant===false)){toast("Remove any file marked unrelated before uploading.");syncUploadButton();return}
- button.disabled=true;if($("uploadManualButton"))$("uploadManualButton").disabled=true;results.innerHTML="";
+ if(uploadQueue.some(item=>item.review&&item.review.relevant===false)){toast("Remove files marked unrelated to study.");syncUploadButton();return}
+ button.disabled=true;results.innerHTML="";
  try{
   if(!uploadReviewDone){
-   await reviewSelectedUploads(manualMode===true);
+   await reviewSelectedUploads();
    if(!uploadReviewDone)return;
+   if(uploadQueue.some(item=>item.aiFailed&&!item.titleConfirmed)){
+    setUploadProgress("Squashberry couldn't generate a file title. Confirm the editable title to continue.",100,false);
+    syncUploadButton();return;
+   }
+  }else{
+   const unconfirmed=uploadQueue.filter(item=>item.aiFailed&&!item.titleConfirmed);
+   if(unconfirmed.some(item=>!String(item.title||"").trim())){toast("Enter a file title first.");return}
+   unconfirmed.forEach(item=>{item.titleConfirmed=true});
   }
-  setUploadProgress("Preparing approved files for upload…",5,true);
+  setUploadProgress("Uploading files…",8,true);
   const form=new FormData(),transcriptMeta=[],reviewTokens=[];
   uploadQueue.forEach(item=>{
    form.append("files",item.file,uploadFinalFilename(item));
@@ -660,30 +693,26 @@ async function handleEasyUpload(cfg,manualMode){
    files.push({name:item.name,path:item.path,size:item.size,download_url:item.download_url,html_url:item.download_url,transcriptPath:item.transcriptPath||""});
   });
   renderFiles();renderPromptCards();
-  results.innerHTML=uploaded.map(item=>{
-   const transcript=item.transcriptPath?'<div class="upload-transcript-note"><strong>Readable transcript saved</strong> · <code>'+esc(item.transcriptPath)+'</code></div>':'<div class="upload-transcript-note">No readable transcript could be extracted from this file. Convert legacy .doc/.ppt files to DOCX/PPTX/PDF so ChatGPT can access extracted text more reliably.</div>';
-   return '<div class="upload-result-item"><strong>FILE '+esc(item.id)+' · '+esc(item.name)+'</strong><div class="upload-path-line"><span>GitHub path</span><code>'+esc(item.path)+'</code><button type="button" data-copy-path="'+esc(item.path)+'">Copy path</button></div>'+transcript+'<div class="modal-actions"><button class="outline-btn" data-copy-file="'+esc(item.id)+'">Copy study prompt</button></div></div>';
-  }).join("");
-  results.querySelectorAll("[data-copy-path]").forEach(button=>button.addEventListener("click",()=>copyText(button.dataset.copyPath)));
-  results.querySelectorAll("[data-copy-file]").forEach(button=>button.addEventListener("click",()=>{
-   const item=uploaded.find(file=>file.id===button.dataset.copyFile);if(item)copyText(promptFor("read",{path:item.path,name:item.name}));
-  }));
-  setUploadProgress("Done! Originals and any readable transcripts have been added to the Library.",100,false);
-  toast(uploaded.length+" file(s) added to Library." );
-  if(data.partial&&data.warning)toast("Some files were saved, but one or more other files need retrying: "+data.warning);
-  uploadDone=true;uploadQueue=[];uploadReviewDone=false;renderUploadPreview();syncUploadButton();
-  try{await refreshDashboard()}catch(refreshError){console.warn("Upload succeeded but the personal dashboard refresh failed",refreshError)}
-  try{await loadFiles(true)}catch(loadError){console.warn("Upload succeeded but refreshing the catalogue view failed",loadError)}
+  uploadDone=true;uploadQueue=[];uploadReviewDone=false;
+  const ids=uploaded.map(item=>"#"+String(item.id).padStart(3,"0"));
+  const prompt=buildUploadedFilesPrompt(uploaded);
+  $("modalKicker").textContent="UPLOAD COMPLETE";
+  $("modalTitle").textContent=uploaded.length===1?"File uploaded":"Files uploaded";
+  $("modalDescription").textContent="Saved "+ids.join(", ")+".";
+  $("modalBody").innerHTML='<div class="prompt-card"><h3>Ready to study</h3><p>'+esc(ids.join(", "))+' · '+esc(uploaded.map(item=>item.name).join(", "))+'</p></div>'+(data.partial?'<p class="upload-help">Some other files need retrying.</p>':'')+'<div class="modal-actions"><button class="primary-btn" id="useUploadedInChatGPT">Use in ChatGPT ↗</button><button class="outline-btn" id="copyUploadedPrompt">Copy prompt</button><button class="outline-btn" id="closeUploadedState">Done</button></div>';
+  $("useUploadedInChatGPT").onclick=()=>openChat(prompt);
+  $("copyUploadedPrompt").onclick=()=>copyText(prompt);
+  $("closeUploadedState").onclick=closeModal;
+  toast(uploaded.length+" file(s) added to Library.");
+  try{await refreshDashboard()}catch(refreshError){console.warn("Upload succeeded but dashboard refresh failed",refreshError)}
+  try{await loadFiles(true)}catch(loadError){console.warn("Upload succeeded but catalogue refresh failed",loadError)}
  }catch(error){
   const message=String(error&&error.message||error);
-  console.error("Squashberry Library upload/review flow failed",{message,status:error&&error.status,stage:error&&error.stage});
+  console.error("Squashberry Library upload failed",{message,status:error&&error.status,stage:error&&error.stage});
   setUploadProgress("Upload did not finish: "+message,0,false);
-  if(error&&error.needsManual&&$("uploadManualButton"))$("uploadManualButton").hidden=false;
-  toast("The upload didn’t finish. Read the message in the upload window.");
+  toast("Upload failed. Check the message in this window.");
  }finally{
-  if($("uploadManualButton"))$("uploadManualButton").disabled=false;
-  button.disabled=uploadDone||!uploadQueue.length||uploadQueue.some(item=>item.review&&item.review.relevant===false);
-  if(!uploadDone)syncUploadButton();
+  if(!uploadDone){const currentButton=$("uploadSubmit");if(currentButton){currentButton.disabled=false;syncUploadButton()}}
  }
 }
 
