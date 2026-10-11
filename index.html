@@ -308,6 +308,8 @@ body:not(.light) .study-nudge{background:linear-gradient(105deg,rgba(189,149,119
 const OWNER="squashberry",REPO="Read",BRANCH="master",INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/";
 const files=[], manifest={version:1,items:[]}, state={filter:"all",query:"",selected:null,theme:localStorage.getItem("library-theme")||"light",welcomeDone:localStorage.getItem("library-welcome")==="1",name:localStorage.getItem("library-name")||""};
 let registrySha=null;
+const authState={token:localStorage.getItem("library-session-token")||"",user:null,dashboard:null,afterAuthAction:null,pendingEmail:"",pendingName:""};
+let turnstileLoadPromise=null;
 const $=id=>document.getElementById(id);
 const extOf=name=>(name.split(".").pop()||"").toLowerCase();
 const prettySize=bytes=>bytes<1024?bytes+" B":bytes<1048576?(bytes/1024).toFixed(0)+" KB":(bytes/1048576).toFixed(1)+" MB";
@@ -380,6 +382,136 @@ async function useDeviceShare(){const data={title:"Library — Squashberry’s P
 function welcome(){if(!state.welcomeDone){setTimeout(()=>$("welcomeBackdrop").classList.add("show"),1750)}else{setTimeout(()=>openSharePopup(false),1500)}}
 function closeWelcome(){state.welcomeDone=true;localStorage.setItem("library-welcome","1");$("welcomeBackdrop").classList.remove("show");setTimeout(()=>openSharePopup(false),350)}
 function updateNavIndicator(view){const nav=document.querySelector(".bottom-nav"),indicator=$("navIndicator"),active=nav&&nav.querySelector('[data-nav="'+view+'"]');if(!nav||!indicator||!active)return;indicator.style.width=active.offsetWidth+"px";indicator.style.transform="translateX("+active.offsetLeft+"px)"} function gotoSection(id){const view=["home","library","prompts","you"].includes(id)?id:"home";const visible=view==="home"?["home","study","homeMore"]:[view];["home","study","homeMore","library","prompts","you"].forEach(name=>{const element=$(name);if(element){element.classList.toggle("view-hidden",!visible.includes(name));if(visible.includes(name)){element.classList.remove("view-enter");void element.offsetWidth;element.classList.add("view-enter")}}});const footer=$("quietFooter");if(footer)footer.classList.toggle("view-hidden",view!=="home");document.querySelectorAll(".nav-item[data-nav]").forEach(n=>{const active=n.dataset.nav===view;n.classList.toggle("active",active);if(active)n.setAttribute("aria-current","page");else n.removeAttribute("aria-current")});document.documentElement.dataset.view=view;updateNavIndicator(view);window.scrollTo({top:0,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
+
+function apiBase(){const cfg=window.LIBRARY_UPLOAD_CONFIG||{};return String(cfg.endpoint||"").trim().replace(/\/+$/,"")}
+function apiConfigured(){const cfg=window.LIBRARY_UPLOAD_CONFIG||{};return Boolean(apiBase()&&cfg.turnstileSiteKey)}
+async function apiFetch(path,options={}){
+ const base=apiBase();if(!base)throw new Error("Personal Library sign-in has not been connected yet. The Cloudflare setup still needs to be completed.");
+ const headers=new Headers(options.headers||{});
+ if(authState.token)headers.set("Authorization","Bearer "+authState.token);
+ if(options.body&&typeof options.body==="string"&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+ const res=await fetch(base+path,{...options,headers});
+ const data=await res.json().catch(()=>({}));
+ if(!res.ok){const e=new Error(data.error||("The Library service returned "+res.status));e.status=res.status;throw e}
+ return data;
+}
+function ensureTurnstileLoaded(){
+ if(window.turnstile)return Promise.resolve(window.turnstile);
+ if(turnstileLoadPromise)return turnstileLoadPromise;
+ turnstileLoadPromise=new Promise((resolve,reject)=>{
+  let script=document.getElementById("turnstileScript");
+  if(!script){script=document.createElement("script");script.id="turnstileScript";script.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";script.async=true;script.defer=true;document.head.appendChild(script)}
+  const loaded=()=>window.turnstile?resolve(window.turnstile):reject(new Error("The human-check service could not be loaded."));
+  const failed=()=>reject(new Error("The human-check service could not be loaded. Check your internet connection."));
+  script.addEventListener("load",loaded,{once:true});script.addEventListener("error",failed,{once:true});
+  if(window.turnstile)resolve(window.turnstile);
+ });
+ return turnstileLoadPromise;
+}
+function installTurnstile(containerId,siteKey,onError){
+ let widgetId=null;
+ const container=$(containerId);
+ if(!container)return ()=>"";
+ ensureTurnstileLoaded().then(api=>{
+  if(!document.getElementById(containerId))return;
+  container.innerHTML="";
+  widgetId=api.render(containerId,{sitekey:siteKey,callback:()=>{}, "expired-callback":()=>{}, "error-callback":()=>{if(onError)onError("The human-check expired. Please try again.")}});
+ }).catch(err=>{if(onError)onError(err.message)});
+ return {getResponse:()=>window.turnstile&&widgetId!==null?window.turnstile.getResponse(widgetId):"",reset:()=>{if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId)}};
+}
+function formatAccountDate(value){
+ if(!value)return "Just now";
+ const n=Number(value);const date=new Date(Number.isFinite(n)&&n>0&&n<1000000000000?n*1000:value);
+ return Number.isNaN(date.getTime())?"Recently":date.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});
+}
+function rawFileUrl(path){return "https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+String(path||"").split("/").map(encodeURIComponent).join("/")}
+function renderAccountPanel(){
+ const panel=$("accountPanel");if(!panel)return;
+ if(!apiBase()){
+  panel.innerHTML='<article class="account-signedout"><div class="account-topline"><div class="account-avatar">✳</div><div class="account-ident"><div class="eyebrow">YOUR PERSONAL LIBRARY</div><h3>Make this space yours.</h3><p>Sign in to keep track of your uploads and manage your Library profile.</p><span class="account-badge">Cloudflare setup pending</span></div></div><p class="account-status">You can still browse the learning materials. Personal sign-in and account uploads will switch on after the Library owner finishes the one-time Cloudflare setup.</p><div class="account-actions"><button class="primary-btn" id="signInBtn">Sign in / Create account</button><button class="outline-btn" id="accountGuideBtn">Read the study guide ↗</button></div></article>';
+  const setupButton=$("signInBtn");if(setupButton)setupButton.addEventListener("click",openAuthModal);
+  const guideButton=$("accountGuideBtn");if(guideButton)guideButton.addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));
+  return;
+ }
+ if(!authState.token||!authState.user){
+  panel.innerHTML='<article class="account-signedout"><div class="account-topline"><div class="account-avatar">✳</div><div class="account-ident"><div class="eyebrow">YOUR PERSONAL LIBRARY</div><h3>Your study space, your name.</h3><p>Sign in with your email. No GitHub account or password needed.</p><span class="account-badge">Email code · secure sign-in</span></div></div><p class="account-status">Keep a record of the files you add, see your recent activity and update your profile. Browsing the public shelves stays open to everyone.</p><div class="account-actions"><button class="primary-btn" id="signInBtn">Sign in / Create account ↗</button><button class="outline-btn" id="accountUploadBtn">Upload a study file</button></div></article>';
+  $("signInBtn").addEventListener("click",openAuthModal);
+  $("accountUploadBtn").addEventListener("click",()=>{authState.afterAuthAction="upload";openAuthModal()});
+  return;
+ }
+ const user=authState.user, dash=authState.dashboard||{stats:{fileCount:0,totalBytes:0},uploads:[],activity:[]};
+ const name=esc(user.displayName||"Student"),email=esc(user.email||""),initial=esc((user.displayName||user.email||"S").trim().charAt(0).toUpperCase());
+ const uploads=dash.uploads||[],activity=dash.activity||[],stats=dash.stats||{fileCount:0,totalBytes:0};
+ const fileRows=uploads.length?uploads.map(item=>'<div class="account-file-row"><span class="account-file-id">#'+esc(item.id)+'</span><div class="account-file-info"><b>'+esc(item.name)+'</b><small>'+esc(prettySize(Number(item.size)||0))+' · '+esc(formatAccountDate(item.createdAt))+'</small></div><a class="account-file-open" href="'+esc(rawFileUrl(item.path))+'" target="_blank" rel="noopener">Open ↗</a></div>').join(""):'<div class="account-empty">Your uploads will show up here. Use “Upload a study file” to add your first document.</div>';
+ const activityRows=activity.length?activity.map(item=>'<div class="account-activity-item"><span class="account-activity-dot"></span><div><b>'+esc(item.detail||item.kind||"Activity")+'</b><small>'+esc(formatAccountDate(item.createdAt))+'</small></div></div>').join(""):'<div class="account-empty">Your study activity will appear here as you use Library.</div>';
+ panel.innerHTML='<article class="account-profile"><div class="account-topline"><div class="account-avatar">'+initial+'</div><div class="account-ident"><div class="eyebrow">WELCOME TO YOUR SPACE</div><h3>Good to see you, '+name+'.</h3><p>'+email+'</p><span class="account-badge">✓ Signed in to your Library</span></div></div><div class="account-edit"><input id="accountNameInput" maxlength="50" value="'+name+'" aria-label="Your display name" placeholder="Your display name"><button class="outline-btn" id="saveAccountName">Save name</button></div><div class="account-stats"><div class="account-stat"><strong>'+esc(stats.fileCount||0)+'</strong><span>Files you uploaded</span></div><div class="account-stat"><strong>'+esc(prettySize(Number(stats.totalBytes)||0))+'</strong><span>Total upload size</span></div><div class="account-stat"><strong>'+esc(formatAccountDate(user.createdAt))+'</strong><span>Library member since</span></div></div><div class="account-actions"><button class="primary-btn" id="accountUploadBtn">Upload a study file ↥</button><button class="outline-btn" id="accountRefreshBtn">Refresh dashboard ↻</button><button class="outline-btn" id="accountSignOutBtn">Sign out</button></div><p class="account-status" id="accountStatus">Your files and activity are linked to this account. Files stored in the public GitHub study shelf are still visible to anyone.</p></article><div class="account-dashboard-grid"><section class="account-subpanel"><h4>Your recent uploads</h4><div class="account-file-list">'+fileRows+'</div></section><section class="account-subpanel"><h4>Recent activity</h4><div class="account-activity-list">'+activityRows+'</div></section></div>';
+ $("accountUploadBtn").addEventListener("click",openUploadModal);
+ $("accountRefreshBtn").addEventListener("click",refreshDashboard);
+ $("accountSignOutBtn").addEventListener("click",signOutAccount);
+ $("saveAccountName").addEventListener("click",saveAccountName);
+}
+async function refreshDashboard(){
+ if(!authState.token||!authState.user){renderAccountPanel();return}
+ const status=$("accountStatus");if(status)status.textContent="Refreshing your dashboard…";
+ try{const result=await apiFetch("/auth/dashboard");authState.dashboard=result;renderAccountPanel()}
+ catch(err){if(err.status===401){clearAccountSession();renderAccountPanel();toast("Please sign in again.")}else{const current=$("accountStatus");if(current)current.textContent="Your account is signed in, but the dashboard could not refresh: "+err.message}}
+}
+async function refreshAuth(){
+ if(!authState.token||!apiBase()){if(!apiBase()){authState.token="";localStorage.removeItem("library-session-token")}authState.user=null;authState.dashboard=null;renderAccountPanel();return}
+ try{const result=await apiFetch("/auth/me");authState.user=result.user;state.name=result.user.displayName||"";localStorage.setItem("library-name",state.name);if(document.documentElement.dataset.view==="you")await refreshDashboard();else renderAccountPanel()}
+ catch(err){if(err.status===401){clearAccountSession();renderAccountPanel()}else{renderAccountPanel();console.warn("Personal Library sign-in check failed",err)}}
+}
+function clearAccountSession(){authState.token="";authState.user=null;authState.dashboard=null;localStorage.removeItem("library-session-token")}
+async function saveAccountName(){
+ const input=$("accountNameInput");if(!input)return;const displayName=input.value.trim();if(displayName.length<2){toast("Use at least two characters for your name.");input.focus();return}
+ const button=$("saveAccountName");button.disabled=true;button.textContent="Saving…";
+ try{const result=await apiFetch("/auth/me",{method:"PATCH",body:JSON.stringify({displayName})});authState.user=result.user;state.name=result.user.displayName;localStorage.setItem("library-name",state.name);toast("Your Library name has been updated.");await refreshDashboard()}
+ catch(err){toast(err.message);button.disabled=false;button.textContent="Save name"}
+}
+async function signOutAccount(){
+ const oldToken=authState.token;try{if(oldToken&&apiBase()){await fetch(apiBase()+"/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+oldToken}})}}catch{}
+ clearAccountSession();renderAccountPanel();toast("You’re signed out. Your public study files remain available.");
+}
+function openAuthModal(){
+ $("modalKicker").textContent="YOUR PERSONAL LIBRARY";$("modalTitle").textContent="Sign in to your Library";$("modalDescription").textContent="We’ll email you a one-time code. No password and no GitHub account needed.";
+ if(!apiConfigured()){
+  $("modalBody").innerHTML='<div class="auth-config-note"><b>Almost ready.</b><br>Personal sign-in is prepared, but the Cloudflare service URL and public Turnstile site key still need to be set by the Library owner. You can browse the study files in the meantime.</div><div class="modal-actions"><button class="outline-btn" id="authClose">Close</button><a class="outline-btn" href="https://github.com/squashberry/Read/tree/master/upload-worker" target="_blank" rel="noopener">Setup guide ↗</a></div>';
+  $("modalBackdrop").classList.add("show");$("authClose").onclick=closeModal;return;
+ }
+ $("modalBody").innerHTML='<div class="upload-form"><div><label for="authDisplayName">Your name <span style="color:var(--muted)">(optional)</span></label><input id="authDisplayName" maxlength="50" autocomplete="name" placeholder="What should we call you?"></div><div style="margin-top:12px"><label for="authEmail">Email address</label><input id="authEmail" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></div><div id="authCaptchaBlock" style="margin-top:14px"><label>Quick safety check</label><div id="authTurnstile"></div></div><div id="authCodeBlock" style="display:none;margin-top:14px"><label for="authCode">Six-digit sign-in code</label><input id="authCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div><p id="authStatus" class="auth-note" aria-live="polite">First time here? Enter your email and we’ll create your Library account after you verify the code.</p><div class="modal-actions"><button class="primary-btn" id="authContinueBtn">Email me a sign-in code ↗</button><button class="outline-btn" id="authCancelBtn">Cancel</button></div><p class="auth-note">The code expires after 10 minutes. Study files uploaded to the public repository are visible to anyone.</p></div>';
+ $("modalBackdrop").classList.add("show");$("authCancelBtn").onclick=closeModal;
+ const cfg=window.LIBRARY_UPLOAD_CONFIG||{};let widget=null,stage="request";
+ const failure=msg=>{const box=$("authStatus");if(box)box.textContent=msg};
+ ensureTurnstileLoaded().then(api=>{if(!$("authTurnstile"))return;widget=api.render("authTurnstile",{sitekey:cfg.turnstileSiteKey,callback:()=>{}, "expired-callback":()=>failure("The safety check expired. Please complete it again."),"error-callback":()=>failure("The safety check did not load. Please refresh and try again.")})}).catch(err=>failure(err.message));
+ $("authContinueBtn").onclick=async()=>{
+  const button=$("authContinueBtn");
+  if(stage==="request"){
+   const email=$("authEmail").value.trim().toLowerCase(),displayName=$("authDisplayName").value.trim(),captcha=window.turnstile&&widget!==null?window.turnstile.getResponse(widget):"";
+   if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){failure("Enter a valid email address first.");$("authEmail").focus();return}
+   if(!captcha){failure("Please complete the safety check first.");return}
+   button.disabled=true;button.textContent="Sending code…";
+   try{
+    const result=await apiFetch("/auth/request-code",{method:"POST",body:JSON.stringify({email,displayName,captcha})});
+    authState.pendingEmail=email;authState.pendingName=displayName;stage="verify";
+    $("authEmail").disabled=true;$("authDisplayName").disabled=true;$("authDisplayName").parentElement.style.display="none";$("authCaptchaBlock").style.display="none";$("authCodeBlock").style.display="block";
+    if(window.turnstile&&widget!==null)window.turnstile.remove(widget);
+    $("authCode").focus();failure(result.message||"Check your email for the six-digit code.");button.textContent="Verify code & sign in";
+   }catch(err){failure(err.message);button.disabled=false;button.textContent="Email me a sign-in code ↗";if(window.turnstile&&widget!==null)window.turnstile.reset(widget);return}
+   button.disabled=false;
+  }else{
+   const code=$("authCode").value.trim();if(!/^\\d{6}$/.test(code)){failure("Enter the six-digit code from your email.");$("authCode").focus();return}
+   button.disabled=true;button.textContent="Signing you in…";
+   try{
+    const result=await apiFetch("/auth/verify-code",{method:"POST",body:JSON.stringify({email:authState.pendingEmail,code})});
+    authState.token=result.token;authState.user=result.user;authState.dashboard=null;localStorage.setItem("library-session-token",result.token);state.name=result.user.displayName||authState.pendingName||"";localStorage.setItem("library-name",state.name);
+    const nextAction=authState.afterAuthAction;authState.afterAuthAction=null;$("modalBackdrop").classList.remove("show");toast("Welcome to your personal Library, "+state.name+".");renderAccountPanel();
+    if(nextAction==="upload"){setTimeout(openUploadModal,120)}
+    else{await refreshDashboard()}
+   }catch(err){failure(err.message);button.disabled=false;button.textContent="Verify code & sign in";return}
+  }
+ };
+}
+
 function installLibrary(){if(deferredInstallPrompt){deferredInstallPrompt.prompt();deferredInstallPrompt.userChoice.then(choice=>{toast(choice.outcome==="accepted"?"Library is being installed.":"You can install Library whenever you're ready.");deferredInstallPrompt=null}).catch(()=>{});return}const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);toast(ios?"To install: tap Share in Safari, then Add to Home Screen.":"Use your browser menu and choose Install app or Add to Home Screen.")}
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;const status=$("installStatus");if(status)status.textContent="Ready to install on this device."});
 $("exploreBtn").addEventListener("click",()=>gotoSection("library"));$("studyAllBtn").addEventListener("click",()=>showStudyPicker("read"));$("refreshBtn").addEventListener("click",loadFiles);$("themeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()+" Start by asking me whether I want to see all available files, find a topic, or study a specific file number."));$("uploadCta").addEventListener("click",openUploadModal);$("shareNowBtn").addEventListener("click",copyShareMessage);$("deviceShareBtn").addEventListener("click",useDeviceShare);$("closeSharePopup").addEventListener("click",closeSharePopup);$("shareBackdrop").addEventListener("click",e=>{if(e.target===$("shareBackdrop"))closeSharePopup()});$("profileShareBtn").addEventListener("click",()=>openSharePopup(true));$("installAppBtn").addEventListener("click",installLibrary);$("profileThemeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("profileRefreshBtn").addEventListener("click",loadFiles);$("chatGuideBtn").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));$("guideShortcut").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));document.querySelectorAll("[data-study]").forEach(b=>b.addEventListener("click",()=>startStudy(b.dataset.study)));document.querySelectorAll(".nav-item[data-nav]").forEach(b=>b.addEventListener("click",()=>gotoSection(b.dataset.nav)));window.addEventListener("resize",()=>updateNavIndicator(document.documentElement.dataset.view||"home"),{passive:true});document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{state.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));renderFiles()}));$("search").addEventListener("input",e=>{state.query=e.target.value;renderFiles()});$("closeModal").addEventListener("click",closeModal);$("modalBackdrop").addEventListener("click",e=>{if(e.target===$("modalBackdrop"))closeModal()});document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();$("welcomeBackdrop").classList.remove("show");closeSharePopup()}});$("nameForm").addEventListener("submit",e=>{e.preventDefault();const name=$("nameInput").value.trim();if(name){state.name=name;localStorage.setItem("library-name",name);toast("Lovely to have you here, "+name+".");}closeWelcome()});$("skipWelcome").addEventListener("click",closeWelcome);
