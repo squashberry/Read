@@ -41,7 +41,9 @@ jobs:
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
             'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'fetch(apiBase()+"/upload"',
-            'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/"',
+            'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
+            'Search topics or file code', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
+            'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'class="splash-byline"'
           ];
@@ -78,11 +80,11 @@ jobs:
           const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
           if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
               !worker.includes('/auth/request-code') || !worker.includes('/auth/verify-code') || !worker.includes('/auth/dashboard') ||
-              !worker.includes('getSessionUser(request,env)')) {
+              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('welcomeEmailHtml(displayName)')) {
             throw new Error('Upload Worker is missing authentication or upload safety controls');
           }
           const schema = fs.readFileSync('upload-worker/schema.sql', 'utf8');
-          for (const table of ['users', 'login_codes', 'sessions', 'uploads', 'activity', 'id_counters']) {
+          for (const table of ['users', 'login_codes', 'sessions', 'uploads', 'activity', 'id_counters', 'push_subscriptions']) {
             if (!schema.includes('CREATE TABLE IF NOT EXISTS ' + table)) throw new Error('D1 schema is missing the ' + table + ' table');
           }
           const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
