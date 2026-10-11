@@ -42,6 +42,8 @@ jobs:
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
             'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'fetch(apiBase()+"/upload"',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
+            '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
+            'rawFileUrl(file.path)', 'rawFileUrl("study-text/"+fileId(file)+".md")',
             'Search topics or file code', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
             'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
@@ -49,6 +51,9 @@ jobs:
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
+          }
+          if (html.includes('Start by asking me whether I want to see all available files, find a topic, or study a specific file number.')) {
+            throw new Error('The home ChatGPT launcher must not append the forced three-choice opener');
           }
           if (html.includes('id="repoLink"') || html.includes('Open website ↗')) {
             throw new Error('Redundant Open website link remains in the UI');
@@ -63,6 +68,9 @@ jobs:
             throw new Error('The ChatGPT instruction page is missing simple learner paths');
           }
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
+          if (!guide.includes('study-text/{ID}.md') || !guide.includes('Before saying “content not available,” try')) {
+            throw new Error('The study guide is missing the readable source-transcript fallback instructions');
+          }
           const guideScriptStart = guide.indexOf('<script>');
           const guideScriptEnd = guide.indexOf('</script>', guideScriptStart);
           if (guideScriptStart >= 0 && guideScriptEnd > guideScriptStart) {
@@ -100,4 +108,14 @@ jobs:
           const missing = registry.items.filter(item => !item.id || !item.name || !item.path || item.kind !== 'study-material');
           if (missing.length) throw new Error('Catalogue entries are missing required study-material metadata');
           console.log('Catalogue OK: ' + registry.items.length + ' uniquely numbered learning files.');
+          for (const item of registry.items) {
+            const id = String(item.id).padStart(3, '0');
+            const transcriptPath = 'study-text/' + id + '.md';
+            if (!fs.existsSync(transcriptPath)) throw new Error('Missing readable slide-text transcript: ' + transcriptPath);
+            const transcript = fs.readFileSync(transcriptPath, 'utf8');
+            if (!transcript.includes('Study text: File ' + id) || !transcript.includes('Original PowerPoint:')) {
+              throw new Error('Study-text fallback has missing source metadata: ' + transcriptPath);
+            }
+          }
+          console.log('Readable study transcripts: OK (' + registry.items.length + ' files).');
           NODE
