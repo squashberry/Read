@@ -56,3 +56,18 @@ CREATE TABLE IF NOT EXISTS id_counters (
   next_id INTEGER NOT NULL
 );
 INSERT OR IGNORE INTO id_counters (name, next_id) VALUES ('study-files', 1);
+
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  endpoint TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  time_zone TEXT NOT NULL DEFAULT 'Africa/Banjul',
+  reminder_time TEXT NOT NULL DEFAULT '08:00',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  last_sent_date TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS push_subscriptions_user_idx ON push_subscriptions(user_id, enabled);
