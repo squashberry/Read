@@ -40,7 +40,7 @@ jobs:
             'id="navIndicator"', 'function updateNavIndicator', 'id="shareBackdrop"',
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
-            'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'Readable transcript saved',
+            'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
             'rawFileUrl(file.path)', 'sourceItem&&sourceItem.transcriptPath',
@@ -98,7 +98,7 @@ jobs:
           }
           if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
               !worker.includes('/auth/request-code') || !worker.includes('/auth/verify-code') || !worker.includes('/auth/dashboard') ||
-              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('welcomeEmailHtml(displayName)')) {
+              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('welcomeEmailHtml(displayName, personalize = false)') || !worker.includes('titleConfirmationFallback') || !worker.includes('user-agent')) {
             throw new Error('Upload Worker is missing authentication or upload safety controls');
           }
           const schema = fs.readFileSync('upload-worker/schema.sql', 'utf8');
