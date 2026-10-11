@@ -441,6 +441,7 @@ function openUploadModal(){
 let uploadQueue=[];
 let uploadReviewDone=false;
 let uploadDone=false;
+let uploadManualAvailable=false;
 function uploadDefaultTitle(file){return niceName(file.name).slice(0,90)||"Study material"}
 function uploadFinalFilename(item){
  const ext=extOf(item.file.name);
@@ -468,7 +469,7 @@ function syncUploadButton(){
  const rejected=uploadQueue.some(item=>item.review&&item.review.relevant===false);
  button.disabled=uploadDone||rejected||!uploadQueue.length;
  button.textContent=uploadDone?"Uploaded ✓":rejected?"Remove unrelated file(s) first":uploadReviewDone?"Upload approved files to Library ↥":"Review selected files with AI ✨";
- if($("uploadManualButton"))$("uploadManualButton").hidden=uploadReviewDone||rejected;
+ if($("uploadManualButton"))$("uploadManualButton").hidden=uploadDone||uploadReviewDone||rejected||!uploadManualAvailable;
 }
 function setUploadProgress(message,percent,active=true){
  const region=$("uploadProcessing"),title=$("uploadProcessingTitle"),detail=$("uploadProcessingDetail"),bar=$("uploadProgressBar");
@@ -557,7 +558,7 @@ async function reviewSelectedUploads(manualMode){
   if(item.reviewToken&&item.review&&item.review.relevant===true)continue;
   setUploadProgress((manualMode?"Checking your manual confirmation":"Reading file "+(index+1)+" of "+uploadQueue.length),Math.round(index/Math.max(1,uploadQueue.length)*55),true);
   try{
-   if(typeof item.text!=="string"){const extracted=await extractStudyText(item.file);item.text=extracted.text;item.extractionNote=extracted.note}
+   if(typeof item.text!=="string"){try{const extracted=await extractStudyText(item.file);item.text=extracted.text;item.extractionNote=extracted.note}catch(parseError){item.text="";item.extractionNote=String(parseError&&parseError.message||"Text extraction failed.")}}
    if(!item.fileHash)item.fileHash=await hashUploadFile(item.file);
    const review=await requestUploadReview(item,manualMode);
    item.review=review;item.reviewToken=review.reviewToken||"";
@@ -565,7 +566,7 @@ async function reviewSelectedUploads(manualMode){
    else{item.reviewToken="";item.reviewError=review.reason||"This file does not appear to be a study resource."}
   }catch(error){
    item.reviewError=error.message||"Review failed";failed=true;
-   if(manualButton&&error.needsManual)manualButton.hidden=false;
+   if(manualButton&&error.needsManual){uploadManualAvailable=true;manualButton.hidden=false;}
    if(progress)progress.textContent=item.file.name+": "+item.reviewError;
   }
   renderUploadPreview();
@@ -577,7 +578,7 @@ async function reviewSelectedUploads(manualMode){
   if(progress)progress.textContent="Review complete. Remove any file marked unrelated before uploading.";
  }else if(failed){
   setUploadProgress("Review could not finish for every file. Retry, or choose manual review below.",0,false);
-  if(manualButton)manualButton.hidden=false;
+  if(manualButton){uploadManualAvailable=true;manualButton.hidden=false;}
  }else{
   setUploadProgress(uploadQueue.some(item=>item.review&&item.review.manualReview)?"Manual review ready. Check each title and confirm that every file is a study resource.":"AI review complete. Check the suggested titles, then upload.",100,false);
  }
@@ -602,7 +603,7 @@ function uploadWithProgress(form){
  });
 }
 function openEasyUploadModal(cfg){
- uploadQueue=[];uploadReviewDone=false;uploadDone=false;
+ uploadQueue=[];uploadReviewDone=false;uploadDone=false;uploadManualAvailable=false;
  $("modalKicker").textContent="ADD TO THE SHELVES";
  $("modalTitle").textContent="Upload your study files";
  $("modalDescription").textContent="Preview each file, review its suggested title, then add approved study material to Library.";
@@ -611,7 +612,7 @@ function openEasyUploadModal(cfg){
  $("cancelUpload").onclick=closeModal;
  $("uploadFiles").addEventListener("change",event=>{
   uploadQueue=Array.from(event.target.files||[]).map(file=>({file,title:uploadDefaultTitle(file),text:undefined,fileHash:"",review:null,reviewToken:"",reviewError:""}));
-  uploadReviewDone=false;uploadDone=false;$("uploadResults").innerHTML="";$("uploadManualButton").hidden=true;
+  uploadReviewDone=false;uploadDone=false;uploadManualAvailable=false;$("uploadResults").innerHTML="";$("uploadManualButton").hidden=true;
   renderUploadPreview();syncUploadButton();
  });
  $("uploadSubmit").onclick=()=>handleEasyUpload(cfg,false);
