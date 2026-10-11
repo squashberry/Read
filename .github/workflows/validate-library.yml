@@ -39,6 +39,8 @@ jobs:
             'data-nav="home"', 'data-nav="library"', 'data-nav="prompts"', 'data-nav="you"',
             'id="navIndicator"', 'function updateNavIndicator', 'id="shareBackdrop"',
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
+            'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
+            'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'fetch(apiBase()+"/upload"',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/"',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'class="splash-byline"'
@@ -67,12 +69,18 @@ jobs:
           if (manifest.display !== 'standalone' || manifest.scope !== './') {
             throw new Error('PWA manifest must use standalone display and repository-relative scope');
           }
-          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/README.md', 'robots.txt', 'sitemap.xml', '.nojekyll']) {
+          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/schema.sql', 'upload-worker/README.md', 'robots.txt', 'sitemap.xml', '.nojekyll']) {
             if (!fs.existsSync(file)) throw new Error('Missing app asset: ' + file);
           }
           const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
-          if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES')) {
-            throw new Error('Upload Worker is missing its safety controls');
+          if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
+              !worker.includes('/auth/request-code') || !worker.includes('/auth/verify-code') || !worker.includes('/auth/dashboard') ||
+              !worker.includes('getSessionUser(request,env)')) {
+            throw new Error('Upload Worker is missing authentication or upload safety controls');
+          }
+          const schema = fs.readFileSync('upload-worker/schema.sql', 'utf8');
+          for (const table of ['users', 'login_codes', 'sessions', 'uploads', 'activity', 'id_counters']) {
+            if (!schema.includes('CREATE TABLE IF NOT EXISTS ' + table)) throw new Error('D1 schema is missing the ' + table + ' table');
           }
           const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
           if (!sitemap.includes('https://squashberry.github.io/Read/') || !sitemap.includes('https://squashberry.github.io/Read/gptinstruction/')) {
