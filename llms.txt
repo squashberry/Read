@@ -1,17 +1,28 @@
-# Library — AI access instructions
+# Squashberry Library — instructions for AI assistants
 
-Live website: https://squashberry-library.onrender.com/
+Website: https://squashberry.github.io/Read/
 Source repository: https://github.com/squashberry/Read
 Repository owner: squashberry
-Repository name/path: /Read
-Default branch: master
+Repository: Read
+Branch: master
+Catalogue: https://raw.githubusercontent.com/squashberry/Read/master/library-index.json
 
-When asked to study or assess this library:
-1. Inspect the repository's file listing first: https://api.github.com/repos/squashberry/Read/contents?ref=master
-2. Pick the relevant uploaded PowerPoint, PDF or other source file.
-3. Retrieve and inspect actual slide/page/document content before teaching. If direct content access fails, say exactly what could not be accessed and ask for the file to be attached or for an accessible text/PDF export.
-4. Build lectures, study notes, flashcards, quizzes and exams from the actual material. Keep the source file name visible in the response. Clearly distinguish source information from supplementary explanations.
-5. For nursing/clinical material, teach for education and remind the learner to verify clinical decisions against current institutional guidance.
-6. Never claim to have opened, read or analysed a document unless you actually accessed its content.
+## Mandatory source-selection rule
 
-The website is a static front end. Study buttons open ChatGPT with a prepared prompt; the site itself does not include an AI API key. The source repository is public, so uploaded files are publicly accessible.
+If the user asks to access Library, study from it, or assess a file, DO NOT confuse the website with the study collection.
+
+- Read library-index.json only to map numeric IDs to uploaded document paths. It is catalogue metadata, not lesson material.
+- Use only actual user-uploaded teaching materials registered with kind: study-material.
+- Never send to the user, display, read aloud, quote, summarize, explain, or teach from index.html, README.md, llms.txt, library-index.json, .gitignore, .nojekyll, .github/**, HTML/CSS/JavaScript, workflow files, or other website/configuration/source files.
+- If the user says 012, look up ID 012 in the catalogue, then use that exact document. Do not guess its filename or substitute website code.
+- If the source document cannot be retrieved or its text/slide content cannot be extracted, explain this honestly and ask for an accessible attachment/export. Never claim to have read inaccessible content.
+- Cite the actual study filename and slide/page where possible, and distinguish facts from source material from supplemental explanation.
+- For nursing or clinical topics, provide educational explanations and remind the learner to verify clinical decisions against current institutional guidance.
+
+## Available study actions
+
+Explain/read, deliver a full lecture, create exams one question at a time, flashcards, revision notes, clinical scenarios, oral viva, explain difficult concepts, and create a topic-based study plan.
+
+## Website capabilities and limits
+
+The site lists uploaded documents and generates prompts that open ChatGPT. The static website does not contain an AI model or secret server-side token. File upload requires a user-supplied fine-grained GitHub token that is limited to the squashberry/Read repository with Contents read/write permission. The token is not persisted by the site. The repository is public, so files uploaded into it are public.
