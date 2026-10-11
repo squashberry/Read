@@ -1,4 +1,4 @@
-name: Validate Library web app
+name: Validate Library app
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Check inline JavaScript syntax and numbered catalogue
+      - name: Validate app script, PWA shell and source catalogue
         run: |
           node <<'NODE'
           const fs = require('node:fs');
@@ -28,9 +28,27 @@ jobs:
           const start = html.indexOf('<script>');
           const end = html.indexOf('</script>', start);
           if (start < 0 || end < 0) throw new Error('Inline script not found in index.html');
-          const script = html.slice(start + '<script>'.length, end);
-          new Function(script);
+          new Function(html.slice(start + '<script>'.length, end));
           console.log('Inline JavaScript syntax: OK');
+
+          const requiredUi = [
+            'data-nav="home"', 'data-nav="library"', 'data-nav="prompts"', 'data-nav="you"',
+            'id="shareBackdrop"', 'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"'
+          ];
+          for (const marker of requiredUi) {
+            if (!html.includes(marker)) throw new Error('Missing app UI element: ' + marker);
+          }
+          if (html.includes('onrender.com')) throw new Error('The app source must not depend on Render hosting.');
+
+          const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
+          if (manifest.display !== 'standalone' || manifest.scope !== './') {
+            throw new Error('PWA manifest must use a standalone display and repository-relative scope.');
+          }
+          for (const file of ['sw.js', 'icon.svg', '.nojekyll']) {
+            if (!fs.existsSync(file)) throw new Error('Missing PWA/static-host file: ' + file);
+          }
+          console.log('PWA shell and four-tab app navigation: OK');
+
           const registry = JSON.parse(fs.readFileSync('library-index.json', 'utf8'));
           if (!Array.isArray(registry.items)) throw new Error('Catalogue has no items array');
           const ids = registry.items.map(item => String(item.id));
