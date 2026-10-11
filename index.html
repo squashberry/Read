@@ -539,12 +539,22 @@ async function hashUploadFile(file){
  const digest=await crypto.subtle.digest("SHA-256",await file.arrayBuffer());
  return Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,"0")).join("");
 }
+async function uploadFileBase64(file){
+ const bytes=new Uint8Array(await file.arrayBuffer());let binary="";
+ for(let offset=0;offset<bytes.length;offset+=0x8000)binary+=String.fromCharCode(...bytes.subarray(offset,offset+0x8000));
+ return btoa(binary);
+}
 async function requestUploadReview(item,manual){
- const response=await fetch(apiBase()+"/upload/review",{method:"POST",headers:{Authorization:"Bearer "+authState.token,"Content-Type":"application/json"},body:JSON.stringify({name:item.file.name,fileHash:item.fileHash,text:item.text||"",title:item.title,manual:manual===true,confirmManual:true})});
+ const body={name:item.file.name,fileHash:item.fileHash,text:item.text||"",title:item.title,manual:manual===true,confirmManual:true};
+ if(!manual&&extOf(item.file.name)==="pdf"&&(item.text||"").trim().length<30){
+  body.pdfBase64=item.pdfBase64||(item.pdfBase64=await uploadFileBase64(item.file));
+ }
+ const response=await fetch(apiBase()+"/upload/review",{method:"POST",headers:{Authorization:"Bearer "+authState.token,"Content-Type":"application/json"},body:JSON.stringify(body)});
  const data=await response.json().catch(()=>({}));
  if(!response.ok||!data.ok){
   const error=new Error(data.error||"The AI review could not finish.");
   error.status=response.status;error.needsManual=data.needsManual===true||response.status===422||response.status===503;
+  error.stage="review";error.apiStatus=response.status;
   throw error;
  }
  return data;
@@ -561,6 +571,7 @@ async function reviewSelectedUploads(manualMode){
    if(typeof item.text!=="string"){try{const extracted=await extractStudyText(item.file);item.text=extracted.text;item.extractionNote=extracted.note}catch(parseError){item.text="";item.extractionNote=String(parseError&&parseError.message||"Text extraction failed.")}}
    if(!item.fileHash)item.fileHash=await hashUploadFile(item.file);
    const review=await requestUploadReview(item,manualMode);
+   if(typeof review.extractedText==="string")item.text=review.extractedText;
    item.review=review;item.reviewToken=review.reviewToken||"";
    if(review.relevant===true){item.title=review.title||item.title;item.reviewError="";}
    else{item.reviewToken="";item.reviewError=review.reason||"This file does not appear to be a study resource."}
@@ -594,7 +605,7 @@ function uploadWithProgress(form){
   };
   xhr.onload=()=>{
    const data=(()=>{try{return JSON.parse(xhr.responseText||"{}")}catch{return {}}})();
-   if(xhr.status<200||xhr.status>=300||!data.ok){const error=new Error(data.error||("Upload service returned HTTP "+xhr.status+" without a readable error. Check Worker logs and the GITHUB_TOKEN secret."));error.status=xhr.status;reject(error);return}
+   if(xhr.status<200||xhr.status>=300||!data.ok){console.error("Squashberry Library upload failed",{status:xhr.status,error:data.error||null,stage:data.stage||null,partialFiles:(data.files||[]).length});const error=new Error(data.error||("Upload service returned HTTP "+xhr.status+" without a readable error. Check Worker logs and the GITHUB_TOKEN secret."));error.status=xhr.status;error.stage=data.stage||null;error.partialFiles=data.files||[];reject(error);return}
    setUploadProgress("GitHub is saving the originals, transcripts and Library catalogue…",96,true);resolve(data);
   };
   xhr.onerror=()=>reject(new Error("Network error while contacting the Library Worker. Check the Worker deployment and browser connection."));
@@ -657,12 +668,15 @@ async function handleEasyUpload(cfg,manualMode){
   results.querySelectorAll("[data-copy-file]").forEach(button=>button.addEventListener("click",()=>{
    const item=uploaded.find(file=>file.id===button.dataset.copyFile);if(item)copyText(promptFor("read",{path:item.path,name:item.name}));
   }));
-  setUploadProgress("Done! Originals and any readable transcripts have been added to the Library.",100,true);
-  toast(uploaded.length+" file(s) added to Library.");
+  setUploadProgress("Done! Originals and any readable transcripts have been added to the Library.",100,false);
+  toast(uploaded.length+" file(s) added to Library." );
+  if(data.partial&&data.warning)toast("Some files were saved, but one or more other files need retrying: "+data.warning);
   uploadDone=true;uploadQueue=[];uploadReviewDone=false;renderUploadPreview();syncUploadButton();
-  await refreshDashboard();loadFiles(true);
+  try{await refreshDashboard()}catch(refreshError){console.warn("Upload succeeded but the personal dashboard refresh failed",refreshError)}
+  try{await loadFiles(true)}catch(loadError){console.warn("Upload succeeded but refreshing the catalogue view failed",loadError)}
  }catch(error){
   const message=String(error&&error.message||error);
+  console.error("Squashberry Library upload/review flow failed",{message,status:error&&error.status,stage:error&&error.stage});
   setUploadProgress("Upload did not finish: "+message,0,false);
   if(error&&error.needsManual&&$("uploadManualButton"))$("uploadManualButton").hidden=false;
   toast("The upload didn’t finish. Read the message in the upload window.");
