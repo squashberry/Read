@@ -258,6 +258,8 @@ async function handleVerifyCode(request, env) {
     await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
     try { await sendWelcomeEmail(email,name,env); }
     catch (error) { console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160)); }
+    try { await sendWelcomeEmail(email,name,env); }
+    catch (error) { console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160)); }
   }
   const sessionToken = randomHex(32);
   const tokenHash = await sha256Hex(sessionToken);
@@ -368,6 +370,159 @@ async function handleUpload(request, env) {
     return response({error:"The upload could not be completed: "+cleanText(error && error.message,220)},502);
   }
 }
+
+function base64UrlDecode(value) {
+  const input = String(value || "").replace(/-/g,"+").replace(/_/g,"/");
+  const padded = input + "=".repeat((4 - input.length % 4) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, ch => ch.charCodeAt(0));
+}
+function base64UrlEncode(bytes) {
+  let binary = "";
+  const array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  for (let i=0;i<array.length;i+=0x8000) binary += String.fromCharCode(...array.subarray(i,i+0x8000));
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"");
+}
+function joinBytes(parts) {
+  const total = parts.reduce((sum,part)=>sum+part.length,0);
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) { joined.set(part,offset); offset += part.length; }
+  return joined;
+}
+function randomBytes(length) { return crypto.getRandomValues(new Uint8Array(length)); }
+async function hkdfBytes(inputKey,salt,info,length) {
+  const material = await crypto.subtle.importKey("raw",inputKey,{name:"HKDF"},false,["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits({name:"HKDF",hash:"SHA-256",salt,info},material,length*8);
+  return new Uint8Array(derived);
+}
+function allowedPushEndpoint(value) {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password) return false;
+    const host = url.hostname.toLowerCase();
+    return host === "fcm.googleapis.com" || host.endsWith(".fcm.googleapis.com") ||
+      host.endsWith(".push.services.mozilla.com") || host.endsWith(".push.apple.com") ||
+      host.endsWith(".notify.windows.com") || host.endsWith(".wns.windows.com");
+  } catch { return false; }
+}
+async function vapidJwt(audience,env) {
+  const privateKey = await crypto.subtle.importKey("pkcs8",base64UrlDecode(env.VAPID_PRIVATE_KEY),{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+  const header = base64UrlEncode(new TextEncoder().encode(JSON.stringify({typ:"JWT",alg:"ES256"})));
+  const claims = base64UrlEncode(new TextEncoder().encode(JSON.stringify({aud:audience,exp:Math.floor(Date.now()/1000)+12*60*60,sub:"mailto:squashberrypro@gmail.com"})));
+  const unsigned = header+"."+claims;
+  const signature = new Uint8Array(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},privateKey,new TextEncoder().encode(unsigned)));
+  return unsigned+"."+base64UrlEncode(signature);
+}
+async function encryptPush(subscription,payload) {
+  const receiverPublic = base64UrlDecode(subscription.p256dh);
+  const authSecret = base64UrlDecode(subscription.auth);
+  const receiverKey = await crypto.subtle.importKey("raw",receiverPublic,{name:"ECDH",namedCurve:"P-256"},false,[]);
+  const senderPair = await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
+  const senderPublic = new Uint8Array(await crypto.subtle.exportKey("raw",senderPair.publicKey));
+  const shared = new Uint8Array(await crypto.subtle.deriveBits({name:"ECDH",public:receiverKey},senderPair.privateKey,256));
+  const keyInfo = joinBytes([new TextEncoder().encode("WebPush: info\0"),receiverPublic,senderPublic]);
+  const inputKeyMaterial = await hkdfBytes(shared,authSecret,keyInfo,32);
+  const salt = randomBytes(16);
+  const cek = await hkdfBytes(inputKeyMaterial,salt,new TextEncoder().encode("Content-Encoding: aes128gcm\0"),16);
+  const nonce = await hkdfBytes(inputKeyMaterial,salt,new TextEncoder().encode("Content-Encoding: nonce\0"),12);
+  const message = joinBytes([new TextEncoder().encode(JSON.stringify(payload)),new Uint8Array([2])]);
+  const aesKey = await crypto.subtle.importKey("raw",cek,{name:"AES-GCM"},false,["encrypt"]);
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:nonce,tagLength:128},aesKey,message));
+  const header = new Uint8Array(16+4+1+senderPublic.length);
+  header.set(salt,0);
+  header[16]=0;header[17]=0;header[18]=16;header[19]=0;
+  header[20]=senderPublic.length;
+  header.set(senderPublic,21);
+  return joinBytes([header,ciphertext]);
+}
+async function sendWebPush(row,payload,env) {
+  if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY) throw new Error("Push server keys are not configured.");
+  if (!allowedPushEndpoint(row.endpoint)) throw new Error("Unsupported push endpoint.");
+  const endpoint = new URL(row.endpoint);
+  const jwt = await vapidJwt(endpoint.origin,env);
+  const body = await encryptPush({p256dh:row.p256dh,auth:row.auth},payload);
+  return fetch(row.endpoint,{method:"POST",redirect:"manual",headers:{
+    "authorization":"vapid t="+jwt+", k="+env.VAPID_PUBLIC_KEY,
+    "content-encoding":"aes128gcm",
+    "content-type":"application/octet-stream",
+    "ttl":"86400",
+    "urgency":"normal"
+  },body});
+}
+async function handlePushSubscribe(request,env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Sign in to enable daily reminders."},401);
+  if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.DB) return response({error:"Browser push is not configured on the Library server yet."},503);
+  const body = await requestJson(request);
+  const subscription = body.subscription || {};
+  const endpoint = String(subscription.endpoint || "");
+  const p256dh = String(subscription.keys && subscription.keys.p256dh || "");
+  const auth = String(subscription.keys && subscription.keys.auth || "");
+  const reminderTime = cleanText(body.reminderTime || "08:00",5);
+  const timeZone = cleanText(body.timeZone || "Africa/Banjul",80);
+  if (!allowedPushEndpoint(endpoint) || p256dh.length < 40 || auth.length < 16) return response({error:"The browser returned an invalid push subscription. Please try enabling reminders again."},400);
+  if (!/^([01]\d|2[0-3]):00$/.test(reminderTime)) return response({error:"Choose a whole-hour reminder time."},400);
+  try { new Intl.DateTimeFormat("en-US",{timeZone}).format(new Date()); }
+  catch { return response({error:"The browser time zone is not supported. Refresh and try again."},400); }
+  const now = Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth,time_zone,reminder_time,enabled,created_at,updated_at,last_sent_date) VALUES (?,?,?,?,?,?,1,?,?, '') ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,time_zone=excluded.time_zone,reminder_time=excluded.reminder_time,enabled=1,updated_at=excluded.updated_at")
+    .bind(endpoint,user.id,p256dh,auth,timeZone,reminderTime,now,now).run();
+  return response({ok:true,enabled:true,reminderTime,timeZone,message:"Daily study reminders are enabled."});
+}
+async function handlePushStatus(request,env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Sign in to check daily reminders."},401);
+  const endpoint = new URL(request.url).searchParams.get("endpoint") || "";
+  let row;
+  if (endpoint && allowedPushEndpoint(endpoint)) {
+    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled FROM push_subscriptions WHERE user_id=? AND endpoint=? LIMIT 1").bind(user.id,endpoint).first();
+  } else {
+    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled FROM push_subscriptions WHERE user_id=? AND enabled=1 ORDER BY updated_at DESC LIMIT 1").bind(user.id).first();
+  }
+  return response({ok:true,enabled:Boolean(row && row.enabled && endpoint && row.endpoint===endpoint),reminderTime:row&&row.reminder_time||"08:00",timeZone:row&&row.time_zone||"Africa/Banjul"});
+}
+async function handlePushUnsubscribe(request,env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Sign in to turn off daily reminders."},401);
+  const body = await requestJson(request);
+  const endpoint = String(body.endpoint || "");
+  if (!allowedPushEndpoint(endpoint)) return response({error:"The browser push endpoint is invalid."},400);
+  await env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id=? AND endpoint=?").bind(user.id,endpoint).run();
+  return response({ok:true,enabled:false});
+}
+function localDateAndTime(date,timeZone) {
+  const parts = new Intl.DateTimeFormat("en-GB",{timeZone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date);
+  const value = Object.fromEntries(parts.filter(part=>part.type!=="literal").map(part=>[part.type,part.value]));
+  return {date:value.year+"-"+value.month+"-"+value.day,time:value.hour+":"+value.minute};
+}
+async function sendDailyReminders(env,scheduledDate=new Date()) {
+  if (!env.DB || !env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY) return;
+  const subscriptions = await env.DB.prepare("SELECT endpoint,user_id,p256dh,auth,time_zone,reminder_time,last_sent_date FROM push_subscriptions WHERE enabled=1").all();
+  for (const row of subscriptions.results || []) {
+    let local;
+    try { local = localDateAndTime(scheduledDate,row.time_zone || "Africa/Banjul"); }
+    catch { continue; }
+    if (local.time !== row.reminder_time || row.last_sent_date === local.date) continue;
+    try {
+      const result = await sendWebPush(row,{
+        title:"A little study reminder",
+        body:"Take 10 minutes for one topic today. A small study session still counts.",
+        tag:"squashberry-daily-study",
+        url:"https://squashberry.github.io/Read/?reminder=1",
+        shareUrl:"https://squashberry.github.io/Read/?share=1"
+      },env);
+      if (result.status >= 200 && result.status < 300) {
+        await env.DB.prepare("UPDATE push_subscriptions SET last_sent_date=?,updated_at=? WHERE endpoint=?").bind(local.date,Math.floor(Date.now()/1000),row.endpoint).run();
+      } else if (result.status===404 || result.status===410) {
+        await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(row.endpoint).run();
+      }
+    } catch (error) {
+      console.warn("Daily Library push failed:",cleanText(error && error.message,150));
+    }
+  }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "";
@@ -383,8 +538,11 @@ export default {
     const path = url.pathname.replace(/\/+$/,"") || "/";
     try {
       if (path === "/health" && request.method === "GET") {
-        const configured = Boolean(env.DB && env.UPLOAD_RATE_LIMIT && env.AUTH_CODE_SECRET && env.RESEND_API_KEY && env.EMAIL_FROM && env.GITHUB_TOKEN && env.TURNSTILE_SECRET_KEY);
-        return response({ok:true,service:"squashberry-library-api",configured});
+        const missing = [];
+        for (const name of ["DB","UPLOAD_RATE_LIMIT","AUTH_CODE_SECRET","RESEND_API_KEY","EMAIL_FROM","GITHUB_TOKEN","TURNSTILE_SECRET_KEY"]) if (!env[name]) missing.push(name);
+        const pushReady = Boolean(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY);
+        if (!pushReady) { if (!env.VAPID_PRIVATE_KEY) missing.push("VAPID_PRIVATE_KEY"); if (!env.VAPID_PUBLIC_KEY) missing.push("VAPID_PUBLIC_KEY"); }
+        return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{emailAuth:Boolean(env.DB&&env.AUTH_CODE_SECRET&&env.RESEND_API_KEY&&env.EMAIL_FROM&&env.TURNSTILE_SECRET_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB),browserPush:pushReady},missing});
       }
       if (path === "/auth/request-code" && request.method === "POST") return await handleRequestCode(request,env);
       if (path === "/auth/verify-code" && request.method === "POST") return await handleVerifyCode(request,env);
@@ -392,10 +550,16 @@ export default {
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
       if (path === "/auth/logout" && request.method === "POST") return await handleLogout(request,env);
+      if (path === "/push/status" && request.method === "GET") return await handlePushStatus(request,env);
+      if (path === "/push/subscribe" && request.method === "POST") return await handlePushSubscribe(request,env);
+      if (path === "/push/unsubscribe" && request.method === "POST") return await handlePushUnsubscribe(request,env);
       if (path === "/upload" && request.method === "POST") return await handleUpload(request,env);
       return response({error:"This Library API route was not found."},404);
     } catch (error) {
       return response({error:"The request could not be completed: "+cleanText(error && error.message,200)},500);
     }
+  },
+  async scheduled(controller,env,ctx) {
+    ctx.waitUntil(sendDailyReminders(env,new Date(controller.scheduledTime || Date.now())));
   }
 };
