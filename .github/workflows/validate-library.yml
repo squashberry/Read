@@ -69,8 +69,9 @@ jobs:
             throw new Error('The ChatGPT instruction page is missing simple learner paths');
           }
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
-          if (!guide.includes('study-text/{ID}.md') || !guide.includes('Before saying “content not available,” try')) {
-            throw new Error('The study guide is missing the readable source-transcript fallback instructions');
+          if (!guide.includes('A file-specific ChatGPT prompt already supplies this URL') ||
+              !guide.includes('never assume a transcript exists or guess its path')) {
+            throw new Error('The study guide is missing direct source-link or optional transcript instructions');
           }
           const guideScriptStart = guide.indexOf('<script>');
           const guideScriptEnd = guide.indexOf('</script>', guideScriptStart);
@@ -118,13 +119,15 @@ jobs:
           }
           console.log('Optional transcript links: OK; only files with actual transcripts are linked.');
           for (const item of registry.items) {
+            if (!item.transcriptPath) continue; // Newly uploaded files may have only their original source URL.
             const id = String(item.id).padStart(3, '0');
             const transcriptPath = 'study-text/' + id + '.md';
-            if (!fs.existsSync(transcriptPath)) throw new Error('Missing readable slide-text transcript: ' + transcriptPath);
+            if (item.transcriptPath !== transcriptPath) throw new Error('Unexpected transcript path for file ' + id);
+            if (!fs.existsSync(transcriptPath)) throw new Error('Missing registered transcript: ' + transcriptPath);
             const transcript = fs.readFileSync(transcriptPath, 'utf8');
             if (!transcript.includes('Study text: File ' + id) || !transcript.includes('Original PowerPoint:')) {
-              throw new Error('Study-text fallback has missing source metadata: ' + transcriptPath);
+              throw new Error('Registered transcript has missing source metadata: ' + transcriptPath);
             }
           }
-          console.log('Readable study transcripts: OK (' + registry.items.length + ' files).');
+          console.log('Registered optional study transcripts: OK.');
           NODE
