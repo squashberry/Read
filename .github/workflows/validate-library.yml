@@ -20,34 +20,55 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Validate app script, PWA shell and source catalogue
+      - name: Validate app JavaScript, instruction page, PWA, SEO and uploads
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('index.html', 'utf8');
           const start = html.indexOf('<script>');
           const end = html.indexOf('</script>', start);
-          if (start < 0 || end < 0) throw new Error('Inline script not found in index.html');
+          if (start < 0 || end < 0) throw new Error('Inline app JavaScript not found');
           new Function(html.slice(start + '<script>'.length, end));
-          console.log('Inline JavaScript syntax: OK');
+          new Function(fs.readFileSync('upload-config.js', 'utf8'));
+          console.log('App and upload-config JavaScript syntax: OK');
 
           const requiredUi = [
             'data-nav="home"', 'data-nav="library"', 'data-nav="prompts"', 'data-nav="you"',
-            'id="shareBackdrop"', 'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"'
+            'id="navIndicator"', 'function updateNavIndicator', 'id="shareBackdrop"',
+            'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
+            'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/"',
+            'property="og:image"', 'name="twitter:card"', 'application/ld+json',
+            'class="splash-byline"'
           ];
           for (const marker of requiredUi) {
-            if (!html.includes(marker)) throw new Error('Missing app UI element: ' + marker);
+            if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
+          }
+          if (html.includes('id="repoLink"') || html.includes('Open website ↗')) {
+            throw new Error('Redundant Open website link remains in the UI');
           }
           if (html.includes('onrender.com')) throw new Error('The app source must not depend on Render hosting.');
 
+          const guide = fs.readFileSync('gptinstruction/index.html', 'utf8');
+          if (!guide.includes('Show me the files') || !guide.includes('find a topic') || !guide.includes('study file number')) {
+            throw new Error('The ChatGPT instruction page is missing simple learner paths');
+          }
+          if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
+          const guideScript = guide.match(/<script>([\\s\\S]*?)<\\/script>/);
+          if (guideScript) new Function(guideScript[1]);
+          console.log('Readable study guide and links: OK');
+
           const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
           if (manifest.display !== 'standalone' || manifest.scope !== './') {
-            throw new Error('PWA manifest must use a standalone display and repository-relative scope.');
+            throw new Error('PWA manifest must use standalone display and repository-relative scope');
           }
-          for (const file of ['sw.js', 'icon.svg', '.nojekyll']) {
-            if (!fs.existsSync(file)) throw new Error('Missing PWA/static-host file: ' + file);
+          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/README.md', '.nojekyll']) {
+            if (!fs.existsSync(file)) throw new Error('Missing app asset: ' + file);
           }
-          console.log('PWA shell and four-tab app navigation: OK');
+          const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
+          if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES')) {
+            throw new Error('Upload Worker is missing its safety controls');
+          }
+          console.log('PWA, social preview, and secure upload Worker assets: OK');
 
           const registry = JSON.parse(fs.readFileSync('library-index.json', 'utf8'));
           if (!Array.isArray(registry.items)) throw new Error('Catalogue has no items array');
