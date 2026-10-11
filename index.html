@@ -309,7 +309,7 @@ body:not(.light) .study-nudge{background:linear-gradient(105deg,rgba(189,149,119
 <script>
 (function(){
 "use strict";
-const OWNER="squashberry",REPO="Read",BRANCH="master",INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/";
+const OWNER="squashberry",REPO="Read",BRANCH="master",INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html";
 const files=[], manifest={version:1,items:[]}, state={filter:"all",query:"",selected:null,theme:localStorage.getItem("library-theme")||"light",welcomeDone:localStorage.getItem("library-welcome")==="1",name:localStorage.getItem("library-name")||""};
 let registrySha=null;
 const authState={token:localStorage.getItem("library-session-token")||"",user:null,dashboard:null,afterAuthAction:null,pendingEmail:"",pendingName:""};
