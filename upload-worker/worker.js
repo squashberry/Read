@@ -91,6 +91,8 @@ export default {
     }
     const uploaded = [];
     try {
+      // Count attempts before writing so failed requests cannot bypass the daily limit.
+      await env.UPLOAD_RATE_LIMIT.put(rateKey, String(used + uploads.length), {expirationTtl: 86400});
       let reg = await gh("/contents/library-index.json?ref=" + BRANCH, env.GITHUB_TOKEN);
       const catalogue = JSON.parse(decodeUtf8Base64(reg.content));
       if (!Array.isArray(catalogue.items)) throw new Error("The numbered file catalogue is invalid.");
@@ -100,24 +102,33 @@ export default {
         const filename = safeName(file.name);
         const path = id + " - " + filename;
         const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+        const entry = {id,name:filename,path,size:file.size,kind:"upload-pending",uploadedAt:new Date().toISOString()};
+        // Reserve the ID in the catalogue first. The SHA check prevents two simultaneous uploads
+        // from silently allocating the same number.
+        catalogue.items.push(entry);
+        catalogue.items.sort((a,b) => Number(a.id)-Number(b.id));
+        const reservation = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
+          method:"PUT",
+          headers:{"content-type":"application/json"},
+          body:JSON.stringify({message:"Reserve study file ID " + id,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),sha:reg.sha,branch:BRANCH})
+        });
+        reg = {sha:reservation.content.sha};
         const bytes = new Uint8Array(await file.arrayBuffer());
-        const stored = await gh("/contents/" + encodedPath, env.GITHUB_TOKEN, {
+        await gh("/contents/" + encodedPath, env.GITHUB_TOKEN, {
           method:"PUT",
           headers:{"content-type":"application/json"},
           body:JSON.stringify({message:"Upload study material " + id + " - " + filename,content:bytesToBase64(bytes),branch:BRANCH})
         });
-        const entry = {id,name:filename,path,size:file.size,kind:"study-material",uploadedAt:new Date().toISOString()};
-        catalogue.items.push(entry);
-        catalogue.items.sort((a,b) => Number(a.id)-Number(b.id));
+        // Publish only after the file contents have been saved successfully.
+        entry.kind = "study-material";
         const update = await gh("/contents/library-index.json", env.GITHUB_TOKEN, {
           method:"PUT",
           headers:{"content-type":"application/json"},
-          body:JSON.stringify({message:"Register study file " + id + " - " + filename,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\n")),sha:reg.sha,branch:BRANCH})
+          body:JSON.stringify({message:"Publish study file " + id + " - " + filename,content:bytesToBase64(new TextEncoder().encode(JSON.stringify(catalogue,null,2)+"\\n")),sha:reg.sha,branch:BRANCH})
         });
         reg = {sha:update.content.sha};
         uploaded.push({id,name:filename,path,size:file.size,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath});
       }
-      await env.UPLOAD_RATE_LIMIT.put(rateKey, String(used + uploaded.length), {expirationTtl: 86400});
       return json({ok:true,files:uploaded});
     } catch (error) {
       return json({error:"The upload could not be completed: " + String(error && error.message || error)}, 502);
