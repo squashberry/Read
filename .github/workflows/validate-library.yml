@@ -43,7 +43,7 @@ jobs:
             'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
-            'rawFileUrl(file.path)', 'sourceItem&&sourceItem.transcriptPath',
+            'rawFileUrl(file.path)', 'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Search topics or file code', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
             'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
@@ -69,9 +69,26 @@ jobs:
             throw new Error('The ChatGPT instruction page is missing simple learner paths');
           }
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
-          if (!guide.includes('A file-specific ChatGPT prompt already supplies this URL') ||
-              !guide.includes('never assume a transcript exists or guess its path')) {
-            throw new Error('The study guide is missing direct source-link or optional transcript instructions');
+          if (!guide.includes('Exam mode 011') ||
+              !guide.includes('deliberately short') ||
+              !guide.includes('never guess one')) {
+            throw new Error('The study guide is missing concise mode commands or source-resolution rules');
+          }
+          const promptStart = html.indexOf('function promptFor(mode,file){');
+          const promptEnd = html.indexOf('function startStudy(mode)', promptStart);
+          const filePrompt = html.slice(promptStart, promptEnd);
+          if (promptStart < 0 || promptEnd < 0 ||
+              !filePrompt.includes('const command=file?') ||
+              /rawFileUrl|transcriptPath|Task:/.test(filePrompt)) {
+            throw new Error('File prompts should contain only the instruction link and a short mode/file-ID command');
+          }
+          const uploadedPromptStart = html.indexOf('function buildUploadedFilesPrompt(uploaded){');
+          const uploadedPromptEnd = html.indexOf('async function handleEasyUpload(cfg)', uploadedPromptStart);
+          const uploadedPrompt = html.slice(uploadedPromptStart, uploadedPromptEnd);
+          if (uploadedPromptStart < 0 || uploadedPromptEnd < 0 ||
+              !uploadedPrompt.includes('Study files ') ||
+              /rawFileUrl|transcriptPath/.test(uploadedPrompt)) {
+            throw new Error('Bulk-upload prompts must use file IDs and the central guide instead of embedding source URLs');
           }
           const guideScriptStart = guide.indexOf('<script>');
           const guideScriptEnd = guide.indexOf('</script>', guideScriptStart);
