@@ -457,7 +457,7 @@ function promptFor(mode,file){
 const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"};
 const modeLabel=modeLabels[mode]||"Read";
 const command=file?modeLabel+" mode "+fileId(file):modeLabel+" mode";
-return basePrompt()+"\\n"+command;
+return basePrompt()+"\n"+command;
 }
 function startStudy(mode){logAccountActivity("started-study","Started "+(mode||"a")+" study session");showStudyPicker(mode)}
 function showStudyPicker(mode){const selected=state.selected;const titles={read:"Read & understand",lecture:"A proper lecture",exam:"Build an exam",flashcards:"Flashcards"};const descriptions={read:"Make the material make sense, not just make it shorter.",lecture:"A calm, complete lecture — one idea at a time.",exam:"Questions based on your own materials, with feedback.",flashcards:"A better way to make the facts stick."};$("modalKicker").textContent="YOUR AI STUDY DESK";$("modalTitle").textContent=titles[mode]||"Study desk";$("modalDescription").textContent=descriptions[mode]||"Choose a source file and start learning.";const options='<option value="">Choose a file (or let ChatGPT choose)</option>'+files.filter(isStudyFile).map(f=>'<option value="'+esc(f.path)+'" '+(selected&&selected.path===f.path?'selected':'')+'>ID '+esc(fileId(f))+' · '+esc(f.name)+'</option>').join("");$("modalBody").innerHTML='<div class="prompt-card"><h3>Choose what to study</h3><p>Choose a numbered learning document to focus on, or let ChatGPT help you find the right material.</p></div><div style="margin-top:15px"><select id="studySource" style="width:100%;padding:14px 13px;border-radius:13px;border:1px solid var(--line);background:var(--bg);color:var(--text)">'+options+'</select></div><div class="modal-actions"><button class="primary-btn" id="launchStudy">Start with ChatGPT ↗</button><button class="outline-btn" id="copyStudy">Copy study prompt</button></div><p style="font-size:11px;line-height:1.7;color:var(--muted);margin-top:16px">ChatGPT opens in a new tab. You may need to be signed in. It must be able to retrieve the source file to teach from it.</p>';$("modalBackdrop").classList.add("show");$("launchStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;state.selected=file;openChat(promptFor(mode,file));closeModal()};$("copyStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;copyText(promptFor(mode,file))}}
@@ -709,7 +709,7 @@ function openEasyUploadModal(cfg){
 }
 function buildUploadedFilesPrompt(uploaded){
  const ids=uploaded.map(item=>String(item.id).padStart(3,"0"));
- return basePrompt()+"\\nStudy files "+ids.join(", ")+" together.";
+ return basePrompt()+"\nStudy files "+ids.join(", ")+" together.";
 }
 async function handleEasyUpload(cfg){
  const ack=$("publicAck"),studyAck=$("studyAck"),button=$("uploadSubmit"),results=$("uploadResults");
