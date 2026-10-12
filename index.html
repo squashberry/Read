@@ -410,7 +410,7 @@ body:not(.light) .study-nudge{background:linear-gradient(105deg,rgba(189,149,119
 <button class="me-tool-action" id="chatGuideBtn" type="button"><span class="me-tool-icon">?</span><span><strong>Study guide</strong><small>How to find files and study with ChatGPT</small></span><span class="me-tool-arrow">↗</span></button>
 </div></section>
 </div>
-<div class="me-privacy-note"><span>◇</span><p><strong>Keep your learning materials safe.</strong> Files added to the public Library can be viewed and downloaded by anyone. Never upload confidential or patient-identifying information.</p></div><p class="prompt-note" style="margin-top:18px">A gentle reminder: files added to Library are publicly accessible. Keep private records and patient-identifying information off the shelf.</p></section>
+<div class="me-privacy-note"><span>◇</span><p><strong>Keep your learning materials safe.</strong> Files added to the public Library can be viewed and downloaded by anyone. Never upload confidential or patient-identifying information.</p></div></section>
 <div class="quiet-footer" id="quietFooter"><span class="leaf">✳</span><span>Shh… it’s quiet here. Take your time. Your future self is cheering for you.</span></div>
 </main>
 <div class="bottom-nav-wrap"><nav class="bottom-nav" aria-label="Primary navigation"><span class="nav-active-indicator" id="navIndicator" aria-hidden="true"></span>
@@ -919,9 +919,18 @@ async function refreshAuth(){
 function clearAccountSession(){authState.token="";authState.user=null;authState.dashboard=null;localStorage.removeItem("library-session-token")}
 async function saveAccountName(){
  const input=$("accountNameInput");if(!input)return;const displayName=input.value.trim();if(displayName.length<2){toast("Use at least two characters for your name.");input.focus();return}
- const button=$("saveAccountName");button.disabled=true;button.textContent="Saving…";
- try{const result=await apiFetch("/auth/me",{method:"PATCH",body:JSON.stringify({displayName})});authState.user=result.user;state.name=result.user.displayName;localStorage.setItem("library-name",state.name);toast("Your Library name has been updated.");await refreshDashboard()}
- catch(err){toast(err.message);button.disabled=false;button.textContent="Save name"}
+ const button=$("saveAccountName");if(button){button.disabled=true;button.textContent="Saving…"}
+ try{
+  const result=await apiFetch("/auth/me",{method:"PATCH",body:JSON.stringify({displayName})});
+  authState.user=result.user;state.name=result.user.displayName;localStorage.setItem("library-name",state.name);
+  input.value=result.user.displayName||displayName;
+  if(button){button.disabled=false;button.textContent="Saved ✓"}
+  toast("Your Library name has been updated.");
+  await refreshDashboard();
+ }catch(err){
+  toast(err.message);
+  if(button){button.disabled=false;button.textContent="Save name"}
+ }
 }
 async function signOutAccount(){
  const oldToken=authState.token;try{if(oldToken&&apiBase()){await fetch(apiBase()+"/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+oldToken}})}}catch{}
