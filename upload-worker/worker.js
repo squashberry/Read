@@ -8,7 +8,6 @@ const DAILY_IP_FILE_LIMIT = 10;
 const DAILY_USER_FILE_LIMIT = 20;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
-const LOGIN_CODE_TTL_SECONDS = 10 * 60;
 
 function response(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -572,6 +571,7 @@ async function handleUpload(request, env) {
           "- Library file ID: " + id + "\n" +
           "- Original uploaded filename: " + item.sourceName + "\n" +
           "- Stored original file: " + path + "\n" +
+          "- Uploaded by Library account: " + (cleanText(user.display_name,50) || "Library member") + "\n" +
           (item.manualReview ? "- Intake review: manually confirmed by the uploader.\n\n" : "- Intake review: AI-assisted title and study-material check.\n\n") +
           "## Extracted text\n\n" + item.text.trim() + "\n";
         stage = "writing the readable text transcript to GitHub";
@@ -586,12 +586,13 @@ async function handleUpload(request, env) {
           })
         });
       }
-      const entry = {id,name:filename,path,size:item.file.size,kind:"study-material",uploadedAt:new Date().toISOString()};
+      const uploadedBy = cleanText(user.display_name,50) || "Library member";
+      const entry = {id,name:filename,path,size:item.file.size,kind:"study-material",uploadedAt:new Date().toISOString(),uploadedBy};
       if (transcriptPath) entry.transcriptPath = transcriptPath;
       stage = "registering the file in the Library catalogue";
       await registerCatalogueEntry(entry,env.GITHUB_TOKEN);
       uploaded.push({
-        id,name:filename,path,size:item.file.size,
+        id,name:filename,path,size:item.file.size,uploadedBy,
         download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath,
         transcriptPath,
         transcript_url:transcriptPath ? "https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+transcriptPath.split("/").map(encodeURIComponent).join("/") : ""
@@ -793,13 +794,14 @@ export default {
     try {
       if (path === "/health" && request.method === "GET") {
         const missing = [];
-        for (const name of ["DB","UPLOAD_RATE_LIMIT","AUTH_CODE_SECRET","RESEND_API_KEY","EMAIL_FROM","GITHUB_TOKEN","TURNSTILE_SECRET_KEY"]) if (!env[name]) missing.push(name);
+        for (const name of ["DB","UPLOAD_RATE_LIMIT","AUTH_CODE_SECRET","GITHUB_TOKEN","TURNSTILE_SECRET_KEY"]) if (!env[name]) missing.push(name);
         const pushReady = Boolean(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY);
         if (!pushReady) { if (!env.VAPID_PRIVATE_KEY) missing.push("VAPID_PRIVATE_KEY"); if (!env.VAPID_PUBLIC_KEY) missing.push("VAPID_PUBLIC_KEY"); }
-        return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{emailAuth:Boolean(env.DB&&env.AUTH_CODE_SECRET&&env.RESEND_API_KEY&&env.EMAIL_FROM&&env.TURNSTILE_SECRET_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB),aiFileReview:Boolean(env.GEMINI_API_KEY),browserPush:pushReady},missing});
+        return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{passwordAuth:Boolean(env.DB&&env.UPLOAD_RATE_LIMIT&&env.TURNSTILE_SECRET_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB&&env.AUTH_CODE_SECRET),aiFileReview:Boolean(env.GEMINI_API_KEY),browserPush:pushReady},missing});
       }
-      if (path === "/auth/request-code" && request.method === "POST") return await handleRequestCode(request,env);
-      if (path === "/auth/verify-code" && request.method === "POST") return await handleVerifyCode(request,env);
+      if (path === "/auth/signup" && request.method === "POST") return await handleSignup(request,env);
+      if (path === "/auth/login" && request.method === "POST") return await handleLogin(request,env);
+      if (path === "/auth/password" && request.method === "POST") return await handleSetPassword(request,env);
       if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
