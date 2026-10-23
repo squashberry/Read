@@ -341,124 +341,108 @@ async function getSessionUser(request, env) {
   ).bind(tokenHash, now).first();
 }
 
-function emailEscape(value) {
-  return String(value || "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
-}
-function libraryEmailLayout(preheader, title, intro, inner) {
-  return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Squashberry Library</title><style>@media(max-width:620px){.email-shell{width:100%!important}.email-pad{padding-left:20px!important;padding-right:20px!important}.email-title{font-size:28px!important}.email-cta{display:block!important;width:auto!important;margin:0 0 10px!important}}</style></head><body style="margin:0;padding:0;background:#f1ece6;font-family:Arial,Helvetica,sans-serif;color:#30261e"><div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">'+emailEscape(preheader)+'</div><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f1ece6;padding:28px 10px"><tr><td align="center"><table role="presentation" class="email-shell" cellpadding="0" cellspacing="0" border="0" width="600" style="width:600px;max-width:600px;background:#fffdf9;border-radius:22px;overflow:hidden;border:1px solid #e7ddd1"><tr><td class="email-pad" style="padding:28px 34px;background:#181a20;color:#fffaf4"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="48" valign="middle"><div style="width:42px;height:42px;border-radius:14px;background:#f1b572;color:#21170d;font-size:24px;line-height:42px;text-align:center;font-weight:bold">S</div></td><td style="padding-left:12px"><div style="font-size:15px;letter-spacing:1.3px;font-weight:bold;color:#fffaf4">SQUASHBERRY LIBRARY</div><div style="font-size:10px;letter-spacing:2px;color:#b8a99b;margin-top:5px;text-transform:uppercase">Study · Learn · Grow</div></td></tr></table></td></tr><tr><td class="email-pad" style="padding:34px 34px 12px"><div style="font-size:11px;letter-spacing:2px;font-weight:bold;text-transform:uppercase;color:#946744;margin-bottom:12px">YOUR STUDY SPACE</div><h1 class="email-title" style="font-size:34px;line-height:1.12;letter-spacing:-1px;margin:0 0 16px;color:#30261e;font-weight:750">'+title+'</h1><p style="font-size:15px;line-height:1.8;color:#73675d;margin:0">'+intro+'</p></td></tr><tr><td class="email-pad" style="padding:18px 34px 16px">'+inner+'</td></tr><tr><td class="email-pad" style="padding:8px 34px 32px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="padding:0 8px 8px 0"><a class="email-cta" href="https://squashberry.github.io/Read/" style="display:inline-block;background:#82583e;border-radius:12px;padding:14px 18px;color:#fffaf4;text-decoration:none;font-size:13px;font-weight:bold">Open Library ↗</a></td><td style="padding:0 0 8px"><a class="email-cta" href="https://squashberry.github.io/Read/gptinstruction/index.html" style="display:inline-block;background:#f3e8dc;border:1px solid #e6d6c5;border-radius:12px;padding:13px 16px;color:#65472f;text-decoration:none;font-size:13px;font-weight:bold">Learn how to use Library ↗</a></td></tr></table></td></tr><tr><td class="email-pad" style="padding:22px 34px;background:#f7f1ea;border-top:1px solid #e9dfd4"><p style="font-size:12px;line-height:1.7;color:#74685e;margin:0 0 8px">A little progress still counts. Pick one topic, open one note, and begin where you are.</p><p style="font-size:11px;line-height:1.7;color:#887b70;margin:0">Privacy note: study files uploaded to the public Library repository can be seen and downloaded by anyone. Only upload material you are allowed to share.</p><p style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9b8c7e;margin:18px 0 0">Made by Squashberry</p></td></tr></table></td></tr></table></body></html>';
-}
-function signInCodeEmailHtml(code, displayName) {
-  const name = cleanText(displayName,50);
-  const inner = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f8f0e6;border:1px solid #ecdfd0;border-radius:16px"><tr><td align="center" style="padding:22px 16px"><div style="font-size:10px;letter-spacing:2px;color:#8a6a50;font-weight:bold;text-transform:uppercase">ONE-TIME SIGN-IN CODE</div><div style="font-family:Arial,sans-serif;font-size:38px;font-weight:bold;letter-spacing:9px;color:#31241b;padding:12px 0 4px">'+emailEscape(code)+'</div><div style="font-size:12px;color:#786a5d">Expires in 10 minutes · can only be used once</div></td></tr></table><p style="font-size:12px;line-height:1.7;color:#7b6e62;margin:16px 0 0">If you did not request this code, you can safely ignore this email.</p>';
-  const intro = name ? "Hi "+emailEscape(name)+", enter this code on the sign-in screen to open your personal Library dashboard." : "Enter this code on the sign-in screen to open your personal Library dashboard.";
-  return libraryEmailLayout("Your one-time code to sign in to Squashberry Library.", "Your sign-in code", intro, inner);
-}
-function welcomeEmailHtml(displayName, personalize = false) {
-  const inner = '<div style="background:#f8f0e6;border:1px solid #ecdfd0;border-radius:16px;padding:20px 22px"><p style="font-size:13px;line-height:1.8;color:#594737;margin:0 0 12px">Here are three easy ways to get started:</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">01</td><td style="font-size:13px;line-height:1.7;color:#594737;padding:0 0 10px"><strong>Find your notes</strong><br>Search by topic, filename, or document code on the Library tab.</td></tr><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">02</td><td style="font-size:13px;line-height:1.7;color:#594737;padding:0 0 10px"><strong>Study with ChatGPT</strong><br>Choose a file and use the study prompt to learn, revise, or practise questions.</td></tr><tr><td width="28" valign="top" style="font-size:16px;color:#9b7049;padding:3px 0">03</td><td style="font-size:13px;line-height:1.7;color:#594737"><strong>Set a small daily goal</strong><br>In the You tab, sign in and enable daily browser reminders if you want a gentle nudge.</td></tr></table></div><p style="font-size:12px;line-height:1.7;color:#7b6e62;margin:17px 0 0">No need to do everything at once. Start with one subject and build from there.</p>';
-  const intro = personalize
-    ? "Hi "+emailEscape(displayName)+", your Squashberry Library account is ready. This is your calm little space to keep study materials together and take the next step in your learning."
-    : "Your Squashberry Library account is ready. This is your calm little space to keep study materials together and take the next step in your learning.";
-  return libraryEmailLayout("Welcome to Squashberry Library. Your study space is ready.", "Welcome, "+emailEscape(displayName)+"!", intro, inner);
-}
-async function sendLibraryEmail(email, subject, text, html, env) {
-  if (!env.RESEND_API_KEY || !env.EMAIL_FROM) throw new Error("Email delivery is not configured.");
-  const result = await fetch("https://api.resend.com/emails", {
-    method:"POST",
-    headers:{"authorization":"Bearer "+env.RESEND_API_KEY,"content-type":"application/json"},
-    body:JSON.stringify({from:env.EMAIL_FROM,to:[email],subject,text,html})
-  });
-  const body = await result.json().catch(() => ({}));
-  if (!result.ok) throw new Error("Email delivery failed. " + cleanText(body.message,180));
-}
-async function sendWelcomeEmail(email, displayName, env, personalize = false) {
-  const name = cleanText(displayName,50) || "there";
-  const greeting = personalize ? "Hi "+name+", " : "Welcome, "+name+"! ";
-  await sendLibraryEmail(
-    email,
-    "Welcome to Squashberry Library — your study space is ready",
-    greeting+"Your Squashberry Library account is ready. Open Library: https://squashberry.github.io/Read/ . Learn how to use Library: https://squashberry.github.io/Read/gptinstruction/index.html . Study files in the public Library repository may be viewed by anyone; only upload material you are allowed to share.",
-    welcomeEmailHtml(name,personalize),
-    env
-  );
-}
-
 function publicUser(user) {
   return {id:user.id,email:user.email,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at,sessionExpiresAt:user.expires_at};
 }
-async function sendLoginCode(email, code, displayName, env) {
-  const name = cleanText(displayName,50);
-  const greeting = name ? "Hi "+name+",\n\n" : "";
-  await sendLibraryEmail(email,"Your Squashberry Library sign-in code",greeting+"Your one-time sign-in code is "+code+". It expires in 10 minutes. If you did not request it, ignore this email.",signInCodeEmailHtml(code,name),env);
+const PASSWORD_PBKDF2_ITERATIONS = 210000;
+function validPassword(password) {
+  return typeof password === "string" && password.length >= 8 && password.length <= 128 && Boolean(password.trim());
 }
-async function handleRequestCode(request, env) {
-  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.AUTH_CODE_SECRET) return response({error:"Personal Library sign-in is not configured yet."},503);
-  const body = await requestJson(request);
-  const email = cleanText(body.email,254).toLowerCase();
-  const displayName = cleanText(body.displayName,50);
-  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
-  if (!await verifyTurnstile(body.captcha, ipOf(request), env.TURNSTILE_SECRET_KEY)) {
-    return response({error:"Please complete the human-check box, then try again."},400);
-  }
-  const emailKey = "login-email:" + await sha256Hex(email);
-  const ipKey = "login-ip:" + await sha256Hex(ipOf(request));
-  if (!await rateLimit(env,emailKey,3,900)) return response({error:"Too many codes requested for this email. Please wait 15 minutes."},429);
-  if (!await rateLimit(env,ipKey,12,3600)) return response({error:"Too many sign-in attempts from this connection. Try again later."},429);
-  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6,"0");
-  const now = Math.floor(Date.now()/1000);
-  const codeHash = await hmacHex(env.AUTH_CODE_SECRET,email+"|"+code);
-  await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now,email).run();
-  await env.DB.prepare(
-    "INSERT INTO login_codes (id,email,code_hash,desired_name,expires_at,attempts,created_at,used_at) VALUES (?,?,?,?,?,0,?,NULL)"
-  ).bind(crypto.randomUUID(),email,codeHash,displayName,now+LOGIN_CODE_TTL_SECONDS,now).run();
-  try {
-    await sendLoginCode(email,code,displayName,env);
-  } catch (error) {
-    await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE email = ? AND used_at IS NULL").bind(now,email).run();
-    return response({error:cleanText(error.message,240) || "Could not send the email. Please try again later."},502);
-  }
-  return response({ok:true,message:"A six-digit sign-in code is on its way. Check your inbox and spam folder.",expiresIn:LOGIN_CODE_TTL_SECONDS});
+async function derivePasswordHash(password, saltHex) {
+  const salt = Uint8Array.from((String(saltHex).match(/.{2}/g) || []), byte => parseInt(byte,16));
+  const key = await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:PASSWORD_PBKDF2_ITERATIONS,hash:"SHA-256"},key,256);
+  return Array.from(new Uint8Array(derived),byte => byte.toString(16).padStart(2,"0")).join("");
 }
-async function handleVerifyCode(request, env) {
-  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.AUTH_CODE_SECRET) return response({error:"Personal Library sign-in is not configured yet."},503);
-  const body = await requestJson(request);
-  const email = cleanText(body.email,254).toLowerCase();
-  const code = cleanText(body.code,10);
-  if (!emailLooksValid(email) || !/^\d{6}$/.test(code)) return response({error:"Enter the same email address and the six-digit code."},400);
-  const ipKey = "verify-ip:" + await sha256Hex(ipOf(request));
-  if (!await rateLimit(env,ipKey,20,3600)) return response({error:"Too many attempts. Please try again later."},429);
-  const now = Math.floor(Date.now()/1000);
-  const row = await env.DB.prepare("SELECT id, code_hash, desired_name, expires_at, attempts FROM login_codes WHERE email = ? AND used_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1").bind(email,now).first();
-  if (!row || row.attempts >= 5) return response({error:"That code has expired or is no longer available. Request a new code."},400);
-  const receivedHash = await hmacHex(env.AUTH_CODE_SECRET,email+"|"+code);
-  if (!timingSafeEqual(receivedHash,row.code_hash)) {
-    await env.DB.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ? AND used_at IS NULL").bind(row.id).run();
-    return response({error:"That code does not match. Check the email and try again."},400);
-  }
-  const used = await env.DB.prepare("UPDATE login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL AND attempts < 5 AND expires_at > ?").bind(now,row.id,now).run();
-  if (!used.meta || used.meta.changes !== 1) return response({error:"That code was already used or has expired. Request a new one."},400);
-  const existing = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,welcome_email_sent_at FROM users WHERE email = ?").bind(email).first();
-  let user = existing;
-  if (!user) {
-    const name = row.desired_name || cleanText(email.split("@")[0],50) || "Student";
-    const id = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO users (id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id,email,name,now,now).run();
-    user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,welcome_email_sent_at FROM users WHERE id = ?").bind(id).first();
-    await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
-  }
-  if (!user.welcome_email_sent_at) {
-    try {
-      await sendWelcomeEmail(email,user.display_name || "there",env,Boolean(cleanText(row.desired_name,50)));
-      await env.DB.prepare("UPDATE users SET welcome_email_sent_at=? WHERE id=? AND welcome_email_sent_at IS NULL").bind(now,user.id).run();
-    } catch (error) {
-      console.warn("Library welcome email could not be sent:",cleanText(error && error.message,160));
-    }
-  }
+async function createSession(user, env, now) {
   const sessionToken = randomHex(32);
   const tokenHash = await sha256Hex(sessionToken);
   const expiresAt = now + SESSION_TTL_SECONDS;
-  await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,created_at,expires_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,tokenHash,now,expiresAt).run();
+  await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
+    .bind(crypto.randomUUID(),user.id,tokenHash,now,expiresAt).run();
   return response({ok:true,token:sessionToken,expiresAt,user:publicUser({...user,expires_at:expiresAt})});
 }
+async function checkPasswordAuth(request, env, email, captcha) {
+  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.TURNSTILE_SECRET_KEY) {
+    return response({error:"Account sign-in is not fully configured yet."},503);
+  }
+  const emailKey = "password-auth-email:" + await sha256Hex(email);
+  const ipKey = "password-auth-ip:" + await sha256Hex(ipOf(request));
+  if (!await rateLimit(env,emailKey,8,900)) return response({error:"Too many attempts for this email. Please wait 15 minutes."},429);
+  if (!await rateLimit(env,ipKey,30,3600)) return response({error:"Too many attempts from this connection. Please try again later."},429);
+  if (!await verifyTurnstile(captcha,ipOf(request),env.TURNSTILE_SECRET_KEY)) {
+    return response({error:"Please complete the human-check box, then try again."},400);
+  }
+  return null;
+}
+async function handleSignup(request, env) {
+  const body = await requestJson(request);
+  const email = cleanText(body.email,254).toLowerCase();
+  const displayName = cleanText(body.displayName,50);
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
+  if (displayName.length < 2) return response({error:"Enter a display name with at least two characters."},400);
+  if (!validPassword(password)) return response({error:"Choose a password between 8 and 128 characters."},400);
+  const check = await checkPasswordAuth(request,env,email,body.captcha);
+  if (check) return check;
+  const existing = await env.DB.prepare("SELECT id,password_hash FROM users WHERE email = ?").bind(email).first();
+  if (existing) {
+    return response({error:existing.password_hash
+      ? "An account with this email already exists. Switch to Sign in."
+      : "This email belongs to an older Library account. For safety, sign in on a device where that account is still active and set a password in You → Profile. Otherwise, the Library owner must migrate the account safely."},409);
+  }
+  const now = Math.floor(Date.now()/1000);
+  const id = crypto.randomUUID();
+  const salt = randomHex(16);
+  const passwordHash = await derivePasswordHash(password,salt);
+  try {
+    await env.DB.prepare("INSERT INTO users (id,email,display_name,password_salt,password_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
+      .bind(id,email,displayName,salt,passwordHash,now,now).run();
+  } catch (error) {
+    const raced = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+    if (raced) return response({error:"An account with this email already exists. Switch to Sign in."},409);
+    throw error;
+  }
+  const user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+  await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)")
+    .bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
+  return await createSession(user,env,now);
+}
+async function handleLogin(request, env) {
+  const body = await requestJson(request);
+  const email = cleanText(body.email,254).toLowerCase();
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
+  if (!password || password.length > 128) return response({error:"Enter your password."},400);
+  const check = await checkPasswordAuth(request,env,email,body.captcha);
+  if (check) return check;
+  const user = await env.DB.prepare("SELECT id,email,display_name,password_salt,password_hash,created_at,updated_at FROM users WHERE email = ?").bind(email).first();
+  if (user && (!user.password_hash || !user.password_salt)) {
+    return response({error:"This is an older Library account without a password. If you are still signed in on another device, open You → Profile and set a password. Otherwise, the Library owner must migrate it safely."},409);
+  }
+  if (!user) {
+    // Run the same expensive derivation for unknown emails to reduce account-enumeration timing differences.
+    await derivePasswordHash(password,"00112233445566778899aabbccddeeff");
+    return response({error:"Email or password is incorrect."},401);
+  }
+  const receivedHash = await derivePasswordHash(password,user.password_salt);
+  if (!timingSafeEqual(receivedHash,user.password_hash)) return response({error:"Email or password is incorrect."},401);
+  return await createSession(user,env,Math.floor(Date.now()/1000));
+}
+async function handleSetPassword(request, env) {
+  const user = await getSessionUser(request,env);
+  if (!user) return response({error:"Sign in to your Library account again before setting a password."},401);
+  const body = await requestJson(request);
+  const password = typeof body.password === "string" ? body.password : "";
+  if (!validPassword(password)) return response({error:"Choose a password between 8 and 128 characters."},400);
+  const salt = randomHex(16);
+  const passwordHash = await derivePasswordHash(password,salt);
+  const now = Math.floor(Date.now()/1000);
+  await env.DB.prepare("UPDATE users SET password_salt = ?, password_hash = ?, updated_at = ? WHERE id = ?")
+    .bind(salt,passwordHash,now,user.id).run();
+  return response({ok:true,message:"Your sign-in password has been saved."});
+}
+
 async function handleMe(request, env) {
   const user = await getSessionUser(request,env);
   if (!user) return response({error:"Please sign in to your personal Library again."},401);
