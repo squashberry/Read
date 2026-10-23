@@ -4,22 +4,12 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   display_name TEXT NOT NULL,
+  password_salt TEXT,
+  password_hash TEXT,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  welcome_email_sent_at INTEGER
+  updated_at INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS login_codes (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL COLLATE NOCASE,
-  code_hash TEXT NOT NULL,
-  desired_name TEXT NOT NULL DEFAULT '',
-  expires_at INTEGER NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  created_at INTEGER NOT NULL,
-  used_at INTEGER
-);
-CREATE INDEX IF NOT EXISTS login_codes_email_idx ON login_codes(email, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY,
