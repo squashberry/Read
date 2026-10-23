@@ -21,9 +21,9 @@ The front end is designed for GitHub Pages at **https://squashberry.github.io/Re
 
 The account API is deployed on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with a D1 database, KV rate-limit namespace, and a Turnstile widget restricted to `squashberry.github.io`. The public endpoint is connected in `upload-config.js` and its `/health` route has been verified from the site.
 
-**Two owner-only settings still need your attention:** (1) add a fine-grained GitHub token as the Worker secret `GITHUB_TOKEN`, restricted to `squashberry/Read` with Contents read/write, so uploads work; (2) verify a domain in Resend and change `EMAIL_FROM` to an address on that domain so sign-in and welcome emails can be delivered reliably. The existing auth, Turnstile, database, KV, and VAPID push secrets are already configured—do not add those again. Never commit secrets to this repository. See `upload-worker/README.md` for exact steps.
+**Account authentication update:** the site now uses direct email-and-password sign-up/sign-in and no longer sends sign-in codes or welcome emails. Resend is no longer needed by the updated Worker. The Worker source and D1 migration are committed, but the existing Cloudflare Worker still needs to be updated manually and the migration `upload-worker/migrations/0002_password_auth.sql` run once before password sign-in will work live. See `upload-worker/README.md` for the exact steps. Keep the private `GITHUB_TOKEN`, Turnstile secret, review-token secret and VAPID private key out of the repository.
 
-Authentication uses Cloudflare Worker + D1 sessions/data, Cloudflare Turnstile and Resend to deliver short-lived email codes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
+Authentication uses Cloudflare Worker + D1 sessions/data, email-and-password accounts, and Cloudflare Turnstile to reduce automated sign-up abuse. Passwords are stored only as salted PBKDF2 hashes; session tokens are stored as hashes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 
 ## Public file warning
 
