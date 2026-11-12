@@ -2,14 +2,9 @@
 
 This Cloudflare Worker powers direct email-and-password sign-up/sign-in, a personal upload dashboard, study-file review, document uploads, and browser push reminders. **It does not send email and does not require Resend.** Email addresses are used as account identifiers but are not verified by email.
 
-## Important: deployment steps for the existing service
+## Deployment and database migration
 
-The website code and Worker code are separate. Committing these files updates GitHub Pages (if its repository deployment is connected), but it does not automatically update a Worker copied manually into Cloudflare.
-
-1. In Cloudflare Dashboard, open **Workers & Pages → D1 → squashberry-library-db → SQL Console** and run the contents of `migrations/0002_password_auth.sql` **once**. Do not run it a second time; SQLite will report that the columns already exist.
-2. Open **Workers & Pages → squashberry-library-api → Edit code**. Replace the deployed Worker source with `worker.js` from this repository and deploy it.
-3. Open `https://squashberry-library-api.squashberrypay.workers.dev/health` from the Library website context or inspect the endpoint response. It should list no missing required configuration for password auth, uploads, and push reminders.
-4. Visit [Squashberry Library](https://squashberry.github.io/Read/), create a test account with an email address and a password of at least eight characters, then sign out and sign back in. Upload a harmless study document to verify the uploader attribution and personal dashboard.
+The static app deploys from GitHub Pages; the API is a separate Cloudflare Worker. Keep `upload-config.js` pointed at the production Worker URL. For an existing D1 database, run `migrations/0002_password_auth.sql` exactly once after checking whether the two columns are already present. The migration adds only `password_salt` and `password_hash`; it does not delete users, upload records, or active sessions. Deploy `worker.js` to `squashberry-library-api` while retaining the existing D1, KV, Turnstile and secret bindings. Verify `/health`, create a test account, sign out/in, and test a harmless upload.
 
 The source includes `schema.sql` for a new D1 database. Existing installations must use the migration above rather than re-running the full schema.
 
