@@ -71,7 +71,7 @@ jobs:
           if (!guide.includes('../?upload=1')) throw new Error('The instruction page has no direct upload link');
           if (!guide.includes('Exam mode 011') ||
               !guide.includes('deliberately short') ||
-              !guide.includes('never guess one')) {
+              !guide.includes('Never assume a transcript exists or guess its path.')) {
             throw new Error('The study guide is missing concise mode commands or source-resolution rules');
           }
           const promptStart = html.indexOf('function promptFor(mode,file){');
