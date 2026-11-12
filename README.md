@@ -12,16 +12,14 @@ Squashberry Library is a mobile-first study web app for keeping learning materia
 - Search numbered learning files and use ready-made study prompts.
 - Install the app to a home screen; the install reminder slides down at the top and disappears after five seconds unless the app is already installed.
 - Open the short ChatGPT guide instead of copying a long technical paragraph.
-- Sign in to a personal dashboard using an email one-time code, change the display name, see upload totals/recent uploads and sign out.
+- Create an account or sign in with an email address and password, change the display name, see upload totals/recent uploads and sign out.
 - Upload documents after signing in—without asking students for a GitHub account or personal GitHub token.
 
 ## Hosting and deployment status
 
 The front end is designed for GitHub Pages at **https://squashberry.github.io/Read/**. In repository Settings → Pages, use branch `master` and folder `/(root)` if Pages has not already been enabled.
 
-The account API is deployed on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with a D1 database, KV rate-limit namespace, and a Turnstile widget restricted to `squashberry.github.io`. The public endpoint is connected in `upload-config.js` and its `/health` route has been verified from the site.
-
-**Account authentication update:** the site now uses direct email-and-password sign-up/sign-in and no longer sends sign-in codes or welcome emails. Resend is no longer needed by the updated Worker. The Worker source and D1 migration are committed, but the existing Cloudflare Worker still needs to be updated manually and the migration `upload-worker/migrations/0002_password_auth.sql` run once before password sign-in will work live. See `upload-worker/README.md` for the exact steps. Keep the private `GITHUB_TOKEN`, Turnstile secret, review-token secret and VAPID private key out of the repository.
+The account API runs on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with an existing D1 database, KV rate-limit namespace and Turnstile sign-in protection. The public endpoint is configured in `upload-config.js`. Password authentication uses the Worker routes `/auth/signup`, `/auth/login` and `/auth/me`; passwords are stored only as salted PBKDF2 hashes. Existing accounts keep their records and any still-valid sessions during the password migration. An account created with the earlier email-code system must use an already-active session to set its first password from You → Profile; the app does not permit an unverified email-only account takeover. Keep all private Worker secrets out of the repository.
 
 Authentication uses Cloudflare Worker + D1 sessions/data, email-and-password accounts, and Cloudflare Turnstile to reduce automated sign-up abuse. Passwords are stored only as salted PBKDF2 hashes; session tokens are stored as hashes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 
