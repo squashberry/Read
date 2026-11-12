@@ -40,7 +40,7 @@ jobs:
             'id="navIndicator"', 'function updateNavIndicator', 'id="shareBackdrop"',
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
-            'apiFetch("/auth/request-code"', 'apiFetch("/auth/verify-code"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
+            'apiFetch(mode==="signup"?"/auth/signup":"/auth/login"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
@@ -114,12 +114,15 @@ jobs:
             throw new Error('File uploads must not require the sign-in Turnstile widget');
           }
           if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
-              !worker.includes('/auth/request-code') || !worker.includes('/auth/verify-code') || !worker.includes('/auth/dashboard') ||
-              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('welcomeEmailHtml(displayName, personalize = false)') || !worker.includes('titleConfirmationFallback') || !worker.includes('user-agent')) {
+              !worker.includes('/auth/signup') || !worker.includes('/auth/login') || !worker.includes('/auth/password') || !worker.includes('/auth/me') || !worker.includes('/auth/dashboard') ||
+              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('titleConfirmationFallback') || !worker.includes('user-agent')) {
             throw new Error('Upload Worker is missing authentication or upload safety controls');
           }
           const schema = fs.readFileSync('upload-worker/schema.sql', 'utf8');
-          for (const table of ['users', 'login_codes', 'sessions', 'uploads', 'activity', 'id_counters', 'push_subscriptions']) {
+          if (!schema.includes('password_salt TEXT') || !schema.includes('password_hash TEXT')) throw new Error('D1 schema is missing password authentication columns');
+          const passwordMigration = fs.readFileSync('upload-worker/migrations/0002_password_auth.sql', 'utf8');
+          if (!/ADD COLUMN password_salt/i.test(passwordMigration) || !/ADD COLUMN password_hash/i.test(passwordMigration)) throw new Error('Existing-database password migration is incomplete');
+          for (const table of ['users', 'sessions', 'uploads', 'activity', 'id_counters', 'push_subscriptions']) {
             if (!schema.includes('CREATE TABLE IF NOT EXISTS ' + table)) throw new Error('D1 schema is missing the ' + table + ' table');
           }
           const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
@@ -131,8 +134,8 @@ jobs:
           if (uploadSectionStart < 0 || uploadSectionEnd < 0 || /turnstile|captcha/i.test(html.slice(uploadSectionStart, uploadSectionEnd))) {
             throw new Error('The uploader must not load or require Cloudflare Turnstile');
           }
-          if (!html.includes('id="authTurnstile"') || !html.includes('apiFetch("/auth/request-code"')) {
-            throw new Error('Turnstile sign-in protection should remain available');
+          if (!html.includes('id="authTurnstile"') || !html.includes('apiFetch(mode==="signup"?"/auth/signup":"/auth/login"')) {
+            throw new Error('Turnstile password sign-in protection should remain available');
           }
           console.log('PWA, social preview, sitemap, and secure upload Worker assets: OK');
 
@@ -143,6 +146,14 @@ jobs:
           const missing = registry.items.filter(item => !item.id || !item.name || !item.path || item.kind !== 'study-material');
           if (missing.length) throw new Error('Catalogue entries are missing required study-material metadata');
           console.log('Catalogue OK: ' + registry.items.length + ' uniquely numbered learning files.');
+          const registeredPaths = new Set(registry.items.map(item => item.path));
+          const sourceDocuments = fs.readdirSync('.').filter(name => /\\.(pdf|ppt|pptx|doc|docx|rtf)$/i.test(name));
+          const unregisteredDocuments = sourceDocuments.filter(name => !registeredPaths.has(name));
+          if (unregisteredDocuments.length) throw new Error('Study documents are missing from library-index.json: ' + unregisteredDocuments.join(', '));
+          for (const item of registry.items) {
+            if (!fs.existsSync(item.path)) throw new Error('Catalogue source file is missing: ' + item.path);
+            if (Number.isFinite(Number(item.size)) && fs.statSync(item.path).size !== Number(item.size)) throw new Error('Catalogue size does not match source file: ' + item.path);
+          }
           for (const item of registry.items) {
             if (item.transcriptPath) {
               const expectedTranscript = 'study-text/' + String(item.id).padStart(3, '0') + '.md';
