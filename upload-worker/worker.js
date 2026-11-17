@@ -343,19 +343,6 @@ async function getSessionUser(request, env) {
 function publicUser(user) {
  return {id:user.id,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at};
 }
-function publicUser(user) {
-  return {id:user.id,email:user.email,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at,sessionExpiresAt:user.expires_at};
-}
-const PASSWORD_PBKDF2_ITERATIONS = 210000;
-function validPassword(password) {
-  return typeof password === "string" && password.length >= 8 && password.length <= 128 && Boolean(password.trim());
-}
-async function derivePasswordHash(password, saltHex) {
-  const salt = Uint8Array.from((String(saltHex).match(/.{2}/g) || []), byte => parseInt(byte,16));
-  const key = await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
-  const derived = await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:PASSWORD_PBKDF2_ITERATIONS,hash:"SHA-256"},key,256);
-  return Array.from(new Uint8Array(derived),byte => byte.toString(16).padStart(2,"0")).join("");
-}
 async function handleMe(request, env) {
   const user = await getSessionUser(request,env);
   if (!user) return response({error:"Please sign in to your personal Library again."},401);
