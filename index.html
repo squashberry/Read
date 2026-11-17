@@ -459,6 +459,15 @@ body:not(.light) .study-nudge{background:linear-gradient(105deg,rgba(189,149,119
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="./upload-config.js"></script>
 <script>
+/* Keep authentication available even when a stale browser cache misses upload-config.js. */
+window.LIBRARY_UPLOAD_CONFIG = Object.assign({
+  endpoint: "https://squashberry-library-api.squashberrypay.workers.dev",
+  supabaseUrl: "https://thcxylgigshrcqthsdat.supabase.co",
+  supabasePublishableKey: "sb_publishable_fVYwlr6P-VpN2lUXoXj60A_pKLfFJLX",
+  vapidPublicKey: "BO7oUjcsmFv0NuY6yaFFOPNn8dW90pnfL5FBeIQsHq6LmJHHbtcbRVA7LrF5mugrrRTBoo62GwvcTmCxp23c0KQ"
+}, window.LIBRARY_UPLOAD_CONFIG || {});
+</script>
+<script>
 (function(){
 "use strict";
 const OWNER="squashberry",REPO="Read",BRANCH="master",INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html";
