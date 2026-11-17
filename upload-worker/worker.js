@@ -7,7 +7,6 @@ const MAX_FILES_PER_REQUEST = 4;
 const DAILY_IP_FILE_LIMIT = 10;
 const DAILY_USER_FILE_LIMIT = 20;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 14;
 
 function response(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -32,11 +31,6 @@ function safeName(name) {
 function extension(name) { return (String(name).split(".").pop() || "").toLowerCase(); }
 function cleanText(value, max = 80) {
   return String(value || "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, max);
-}
-function emailLooksValid(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254; }
-function randomHex(length = 32) {
-  const bytes = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 }
 function decodeUtf8Base64(value) {
   const binary = atob(String(value || "").replace(/\s/g, ""));
@@ -237,14 +231,6 @@ async function handleUploadReview(request, env) {
     cleanLibraryTitle(body.title, sourceName), true, true, manualReason, env
   ));
 }
-function timingSafeEqual(a, b) {
-  a = String(a || "");
-  b = String(b || "");
-  let diff = a.length ^ b.length;
-  const length = Math.max(a.length, b.length);
-  for (let i = 0; i < length; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
-  return diff === 0;
-}
 async function rateLimit(env, key, limit, ttlSeconds, increment = 1) {
   const current = Number(await env.UPLOAD_RATE_LIMIT.get(key) || 0);
   if (current + increment > limit) return false;
@@ -252,15 +238,6 @@ async function rateLimit(env, key, limit, ttlSeconds, increment = 1) {
   return true;
 }
 function ipOf(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
-async function verifyTurnstile(token, ip, secret) {
-  if (!token || !secret) return false;
-  const body = new URLSearchParams({secret, response:token});
-  if (ip && ip !== "unknown") body.set("remoteip", ip);
-  try {
-    const result = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {method:"POST",body}).then(r => r.json());
-    return result.success === true && result.hostname === "squashberry.github.io";
-  } catch { return false; }
-}
 async function requestJson(request) {
   try { return await request.json(); }
   catch { throw new Error("The request was not valid JSON."); }
@@ -328,18 +305,44 @@ async function registerCatalogueEntry(entry, token) {
   }
   throw new Error("Could not save the file catalogue after several attempts. Please retry.");
 }
-async function getSessionUser(request, env) {
-  const header = request.headers.get("Authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!token || !env.DB) return null;
-  const tokenHash = await sha256Hex(token);
-  const now = Math.floor(Date.now()/1000);
-  return env.DB.prepare(
-    "SELECT u.id, u.email, u.display_name, u.created_at, u.updated_at, s.expires_at " +
-    "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?"
-  ).bind(tokenHash, now).first();
+let uploadCategoriesTableReady=false;
+async function ensureUploadCategoriesTable(env){
+ if(uploadCategoriesTableReady)return;
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS upload_categories (file_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'Uncategorised', created_at INTEGER NOT NULL, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS upload_categories_user_category_idx ON upload_categories(user_id, category)").run();
+ uploadCategoriesTableReady=true;
 }
-
+async function getSessionUser(request, env) {
+ const header=request.headers.get("Authorization")||"";
+ const token=header.startsWith("Bearer ")?header.slice(7).trim():"";
+ const base=String(env.SUPABASE_URL||"").replace(/\/+$/,"");
+ if(!token||!env.DB||!base||!env.SUPABASE_PUBLISHABLE_KEY)return null;
+ let authUser;
+ try{
+  const authResponse=await fetch(base+"/auth/v1/user",{headers:{apikey:env.SUPABASE_PUBLISHABLE_KEY,Authorization:"Bearer "+token,Accept:"application/json"},cache:"no-store"});
+  if(!authResponse.ok)return null;
+  authUser=await authResponse.json();
+ }catch(authError){console.warn("Supabase token verification failed:",cleanText(authError&&authError.message,160));return null}
+ const id=cleanText(authUser&&authUser.id,64);
+ const email=cleanText(authUser&&authUser.email,254).toLowerCase();
+ if(!id||!email||email.indexOf("@")<1)return null;
+ await ensureUploadCategoriesTable(env);
+ let user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+ if(!user){
+  const collision=await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
+  const storedEmail=collision?"library-"+id+"@accounts.invalid":email;
+  const metadata=authUser.user_metadata||{};
+  const displayName=cleanText(metadata.display_name||metadata.full_name||metadata.name,50)||email.split("@")[0].slice(0,50)||"Student";
+  const now=Math.floor(Date.now()/1000);
+  await env.DB.prepare("INSERT OR IGNORE INTO users (id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id,storedEmail,displayName,now,now).run();
+  user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+  if(user&&!collision)await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
+ }
+ return user?{...user,expires_at:null}:null;
+}
+function publicUser(user) {
+ return {id:user.id,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at};
+}
 function publicUser(user) {
   return {id:user.id,email:user.email,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at,sessionExpiresAt:user.expires_at};
 }
@@ -353,95 +356,6 @@ async function derivePasswordHash(password, saltHex) {
   const derived = await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:PASSWORD_PBKDF2_ITERATIONS,hash:"SHA-256"},key,256);
   return Array.from(new Uint8Array(derived),byte => byte.toString(16).padStart(2,"0")).join("");
 }
-async function createSession(user, env, now) {
-  const sessionToken = randomHex(32);
-  const tokenHash = await sha256Hex(sessionToken);
-  const expiresAt = now + SESSION_TTL_SECONDS;
-  await env.DB.prepare("INSERT INTO sessions (id,user_id,token_hash,created_at,expires_at) VALUES (?,?,?,?,?)")
-    .bind(crypto.randomUUID(),user.id,tokenHash,now,expiresAt).run();
-  return response({ok:true,token:sessionToken,expiresAt,user:publicUser({...user,expires_at:expiresAt})});
-}
-async function checkPasswordAuth(request, env, email, captcha) {
-  if (!env.DB || !env.UPLOAD_RATE_LIMIT || !env.TURNSTILE_SECRET_KEY) {
-    return response({error:"Account sign-in is not fully configured yet."},503);
-  }
-  const emailKey = "password-auth-email:" + await sha256Hex(email);
-  const ipKey = "password-auth-ip:" + await sha256Hex(ipOf(request));
-  if (!await rateLimit(env,emailKey,8,900)) return response({error:"Too many attempts for this email. Please wait 15 minutes."},429);
-  if (!await rateLimit(env,ipKey,30,3600)) return response({error:"Too many attempts from this connection. Please try again later."},429);
-  if (!await verifyTurnstile(captcha,ipOf(request),env.TURNSTILE_SECRET_KEY)) {
-    return response({error:"Please complete the human-check box, then try again."},400);
-  }
-  return null;
-}
-async function handleSignup(request, env) {
-  const body = await requestJson(request);
-  const email = cleanText(body.email,254).toLowerCase();
-  const displayName = cleanText(body.displayName,50);
-  const password = typeof body.password === "string" ? body.password : "";
-  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
-  if (displayName.length < 2) return response({error:"Enter a display name with at least two characters."},400);
-  if (!validPassword(password)) return response({error:"Choose a password between 8 and 128 characters."},400);
-  const check = await checkPasswordAuth(request,env,email,body.captcha);
-  if (check) return check;
-  const existing = await env.DB.prepare("SELECT id,password_hash FROM users WHERE email = ?").bind(email).first();
-  if (existing) {
-    return response({error:existing.password_hash
-      ? "An account with this email already exists. Switch to Sign in."
-      : "This email belongs to an older Library account. For safety, sign in on a device where that account is still active and set a password in You → Profile. Otherwise, the Library owner must migrate the account safely."},409);
-  }
-  const now = Math.floor(Date.now()/1000);
-  const id = crypto.randomUUID();
-  const salt = randomHex(16);
-  const passwordHash = await derivePasswordHash(password,salt);
-  try {
-    await env.DB.prepare("INSERT INTO users (id,email,display_name,password_salt,password_hash,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
-      .bind(id,email,displayName,salt,passwordHash,now,now).run();
-  } catch (error) {
-    const raced = await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
-    if (raced) return response({error:"An account with this email already exists. Switch to Sign in."},409);
-    throw error;
-  }
-  const user = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
-  await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)")
-    .bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
-  return await createSession(user,env,now);
-}
-async function handleLogin(request, env) {
-  const body = await requestJson(request);
-  const email = cleanText(body.email,254).toLowerCase();
-  const password = typeof body.password === "string" ? body.password : "";
-  if (!emailLooksValid(email)) return response({error:"Enter a valid email address."},400);
-  if (!password || password.length > 128) return response({error:"Enter your password."},400);
-  const check = await checkPasswordAuth(request,env,email,body.captcha);
-  if (check) return check;
-  const user = await env.DB.prepare("SELECT id,email,display_name,password_salt,password_hash,created_at,updated_at FROM users WHERE email = ?").bind(email).first();
-  if (user && (!user.password_hash || !user.password_salt)) {
-    return response({error:"This is an older Library account without a password. If you are still signed in on another device, open You → Profile and set a password. Otherwise, the Library owner must migrate it safely."},409);
-  }
-  if (!user) {
-    // Run the same expensive derivation for unknown emails to reduce account-enumeration timing differences.
-    await derivePasswordHash(password,"00112233445566778899aabbccddeeff");
-    return response({error:"Email or password is incorrect."},401);
-  }
-  const receivedHash = await derivePasswordHash(password,user.password_salt);
-  if (!timingSafeEqual(receivedHash,user.password_hash)) return response({error:"Email or password is incorrect."},401);
-  return await createSession(user,env,Math.floor(Date.now()/1000));
-}
-async function handleSetPassword(request, env) {
-  const user = await getSessionUser(request,env);
-  if (!user) return response({error:"Sign in to your Library account again before setting a password."},401);
-  const body = await requestJson(request);
-  const password = typeof body.password === "string" ? body.password : "";
-  if (!validPassword(password)) return response({error:"Choose a password between 8 and 128 characters."},400);
-  const salt = randomHex(16);
-  const passwordHash = await derivePasswordHash(password,salt);
-  const now = Math.floor(Date.now()/1000);
-  await env.DB.prepare("UPDATE users SET password_salt = ?, password_hash = ?, updated_at = ? WHERE id = ?")
-    .bind(salt,passwordHash,now,user.id).run();
-  return response({ok:true,message:"Your sign-in password has been saved."});
-}
-
 async function handleMe(request, env) {
   const user = await getSessionUser(request,env);
   if (!user) return response({error:"Please sign in to your personal Library again."},401);
@@ -461,12 +375,12 @@ async function handleDashboard(request, env) {
   const user = await getSessionUser(request,env);
   if (!user) return response({error:"Please sign in to your personal Library again."},401);
   const summary = await env.DB.prepare("SELECT COUNT(*) AS file_count, COALESCE(SUM(file_size),0) AS total_bytes FROM uploads WHERE user_id = ?").bind(user.id).first();
-  const uploads = await env.DB.prepare("SELECT file_id,file_name,file_path,file_size,created_at FROM uploads WHERE user_id = ? ORDER BY created_at DESC LIMIT 12").bind(user.id).all();
+  const uploads = await env.DB.prepare("SELECT u.file_id,u.file_name,u.file_path,u.file_size,u.created_at,COALESCE(c.category, 'Uncategorised') AS category FROM uploads u LEFT JOIN upload_categories c ON c.file_id = u.file_id AND c.user_id = u.user_id WHERE u.user_id = ? ORDER BY u.created_at DESC").bind(user.id).all();
   const activity = await env.DB.prepare("SELECT kind,detail,created_at FROM activity WHERE user_id = ? ORDER BY created_at DESC LIMIT 8").bind(user.id).all();
   return response({
     ok:true,
     stats:{fileCount:Number(summary.file_count||0),totalBytes:Number(summary.total_bytes||0)},
-    uploads:(uploads.results||[]).map(row=>({id:String(row.file_id).padStart(3,"0"),name:row.file_name,path:row.file_path,size:Number(row.file_size||0),createdAt:row.created_at})),
+    uploads:(uploads.results||[]).map(row=>({id:String(row.file_id).padStart(3,"0"),name:row.file_name,path:row.file_path,size:Number(row.file_size||0),category:row.category||"Uncategorised",createdAt:row.created_at})),
     activity:(activity.results||[]).map(row=>({kind:row.kind,detail:row.detail,createdAt:row.created_at}))
   });
 }
@@ -480,12 +394,6 @@ async function handleActivity(request, env) {
   if (!allowed.has(kind)) return response({error:"That activity type is not supported."},400);
   const now = Math.floor(Date.now()/1000);
   await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,kind,detail||kind,now).run();
-  return response({ok:true});
-}
-async function handleLogout(request, env) {
-  const header = request.headers.get("Authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (token && env.DB) await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(await sha256Hex(token)).run();
   return response({ok:true});
 }
 async function handleUpload(request, env) {
@@ -515,6 +423,7 @@ async function handleUpload(request, env) {
   if (!Array.isArray(reviewTokens) || !Array.isArray(transcripts) || reviewTokens.length !== uploads.length || transcripts.length !== uploads.length) {
     return response({error:"Each file needs a matching review record. Please review the selected files again."},400);
   }
+  const category = cleanText(form.get("category"),40) || "Uncategorised";
   const prepared = [];
   const nowSeconds = Math.floor(Date.now()/1000);
   for (let i=0;i<uploads.length;i++) {
@@ -587,12 +496,12 @@ async function handleUpload(request, env) {
         });
       }
       const uploadedBy = cleanText(user.display_name,50) || "Library member";
-      const entry = {id,name:filename,path,size:item.file.size,kind:"study-material",uploadedAt:new Date().toISOString(),uploadedBy};
+      const entry = {id,name:filename,path,size:item.file.size,kind:"study-material",uploadedAt:new Date().toISOString(),uploadedBy,category};
       if (transcriptPath) entry.transcriptPath = transcriptPath;
       stage = "registering the file in the Library catalogue";
       await registerCatalogueEntry(entry,env.GITHUB_TOKEN);
       uploaded.push({
-        id,name:filename,path,size:item.file.size,uploadedBy,
+        id,name:filename,path,size:item.file.size,uploadedBy,category,
         download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath,
         transcriptPath,
         transcript_url:transcriptPath ? "https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+transcriptPath.split("/").map(encodeURIComponent).join("/") : ""
@@ -602,8 +511,8 @@ async function handleUpload(request, env) {
         stage = "saving the upload history";
         await env.DB.prepare("INSERT INTO uploads (id,user_id,file_id,file_name,file_path,file_size,created_at) VALUES (?,?,?,?,?,?,?)")
           .bind(crypto.randomUUID(),user.id,id,filename,path,item.file.size,now).run();
-        await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)")
-          .bind(crypto.randomUUID(),user.id,"uploaded-file","Uploaded "+filename+" (file "+id+")",now).run();
+        await env.DB.prepare("INSERT OR REPLACE INTO upload_categories (file_id,user_id,category,created_at) VALUES (?,?,?,?)").bind(id,user.id,category,now).run();
+        await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"uploaded-file","Uploaded "+filename+" (file "+id+") · "+category,now).run();
       } catch (historyError) {
         // The source and catalogue are already committed to GitHub. Don't tell the user
         // the upload failed merely because the optional personal dashboard record failed.
@@ -794,18 +703,14 @@ export default {
     try {
       if (path === "/health" && request.method === "GET") {
         const missing = [];
-        for (const name of ["DB","UPLOAD_RATE_LIMIT","AUTH_CODE_SECRET","GITHUB_TOKEN","TURNSTILE_SECRET_KEY"]) if (!env[name]) missing.push(name);
+        for (const name of ["DB","UPLOAD_RATE_LIMIT","AUTH_CODE_SECRET","GITHUB_TOKEN","SUPABASE_URL","SUPABASE_PUBLISHABLE_KEY"]) if (!env[name]) missing.push(name);
         const pushReady = Boolean(env.VAPID_PRIVATE_KEY && env.VAPID_PUBLIC_KEY);
         if (!pushReady) { if (!env.VAPID_PRIVATE_KEY) missing.push("VAPID_PRIVATE_KEY"); if (!env.VAPID_PUBLIC_KEY) missing.push("VAPID_PUBLIC_KEY"); }
-        return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{passwordAuth:Boolean(env.DB&&env.UPLOAD_RATE_LIMIT&&env.TURNSTILE_SECRET_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB&&env.AUTH_CODE_SECRET),aiFileReview:Boolean(env.GEMINI_API_KEY),browserPush:pushReady},missing});
+        return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{supabaseAuth:Boolean(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB&&env.AUTH_CODE_SECRET),aiFileReview:Boolean(env.GEMINI_API_KEY),browserPush:pushReady},missing});
       }
-      if (path === "/auth/signup" && request.method === "POST") return await handleSignup(request,env);
-      if (path === "/auth/login" && request.method === "POST") return await handleLogin(request,env);
-      if (path === "/auth/password" && request.method === "POST") return await handleSetPassword(request,env);
       if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
-      if (path === "/auth/logout" && request.method === "POST") return await handleLogout(request,env);
       if (path === "/push/status" && request.method === "GET") return await handlePushStatus(request,env);
       if (path === "/push/subscribe" && request.method === "POST") return await handlePushSubscribe(request,env);
       if (path === "/push/unsubscribe" && request.method === "POST") return await handlePushUnsubscribe(request,env);
