@@ -1,4 +1,4 @@
-const CACHE_NAME = "squashberry-library-shell-v6";
+const CACHE_NAME = "squashberry-library-shell-v7";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./og-image.svg", "./upload-config.js", "./gptinstruction/"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -11,6 +11,13 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.endsWith("/upload-config.js")) {
+    event.respondWith(fetch(request, {cache: "no-store"}).then((response) => {
+      if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+      return response;
+    }).catch(() => caches.match(request)));
+    return;
+  }
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).then((response) => {
       const copy = response.clone();
