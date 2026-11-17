@@ -19,7 +19,7 @@ Squashberry Library is a mobile-first study web app for keeping learning materia
 
 The front end is designed for GitHub Pages at **https://squashberry.github.io/Read/**. In repository Settings → Pages, use branch `master` and folder `/(root)` if Pages has not already been enabled.
 
-The account API runs on Cloudflare Workers at `https://squashberry-library-api.squashberrypay.workers.dev`, with an existing D1 database, KV rate-limit namespace and Turnstile sign-in protection. The public endpoint is configured in `upload-config.js`. Password authentication uses the Worker routes `/auth/signup`, `/auth/login` and `/auth/me`; passwords are stored only as salted PBKDF2 hashes. Existing accounts keep their records and any still-valid sessions during the password migration. An account created with the earlier email-code system must use an already-active session to set its first password from You → Profile; the app does not permit an unverified email-only account takeover. Keep all private Worker secrets out of the repository.
+Email/password accounts and sessions use a dedicated Supabase Auth project. The Cloudflare Worker is only the file API and verifies Supabase access tokens. Cloudflare Turnstile is no longer used for authentication. Public Supabase settings are in `upload-config.js`; private Worker secrets remain server-side.
 
 Authentication uses Cloudflare Worker + D1 sessions/data, email-and-password accounts, and Cloudflare Turnstile to reduce automated sign-up abuse. Passwords are stored only as salted PBKDF2 hashes; session tokens are stored as hashes. The GitHub write token is stored only as a server-side Cloudflare Worker secret. Students should never have to paste it into the site.
 

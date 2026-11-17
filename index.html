@@ -467,8 +467,9 @@ const popupVisitCount=(Number.parseInt(localStorage.getItem("library-popup-visit
 localStorage.setItem("library-popup-visits",String(popupVisitCount));
 const showPopupThisVisit=popupVisitCount===1||popupVisitCount%3===0;
 let registrySha=null;
-const authState={token:localStorage.getItem("library-session-token")||"",user:null,dashboard:null,afterAuthAction:null,pendingEmail:"",pendingName:""};
-let turnstileLoadPromise=null;
+let savedLibrarySession=null;try{savedLibrarySession=JSON.parse(localStorage.getItem("library-supabase-session")||"null")}catch{}
+const authState={token:String(savedLibrarySession&&savedLibrarySession.access_token||""),refreshToken:String(savedLibrarySession&&savedLibrarySession.refresh_token||""),tokenExpiresAt:Number(savedLibrarySession&&savedLibrarySession.expires_at||0)*1000,user:null,dashboard:null,afterAuthAction:null};
+localStorage.removeItem("library-session-token");
 const $=id=>document.getElementById(id);
 const extOf=name=>(name.split(".").pop()||"").toLowerCase();
 const prettySize=bytes=>bytes<1024?bytes+" B":bytes<1048576?(bytes/1024).toFixed(0)+" KB":(bytes/1048576).toFixed(1)+" MB";
@@ -490,7 +491,7 @@ return basePrompt()+"\n"+command;
 function startStudy(mode){logAccountActivity("started-study","Started "+(mode||"a")+" study session");showStudyPicker(mode)}
 function showStudyPicker(mode){const selected=state.selected;const titles={read:"Read & understand",lecture:"A proper lecture",exam:"Build an exam",flashcards:"Flashcards"};const descriptions={read:"Make the material make sense, not just make it shorter.",lecture:"A calm, complete lecture — one idea at a time.",exam:"Questions based on your own materials, with feedback.",flashcards:"A better way to make the facts stick."};$("modalKicker").textContent="YOUR AI STUDY DESK";$("modalTitle").textContent=titles[mode]||"Study desk";$("modalDescription").textContent=descriptions[mode]||"Choose a source file and start learning.";const options='<option value="">Choose a file (or let ChatGPT choose)</option>'+files.filter(isStudyFile).map(f=>'<option value="'+esc(f.path)+'" '+(selected&&selected.path===f.path?'selected':'')+'>ID '+esc(fileId(f))+' · '+esc(f.name)+'</option>').join("");$("modalBody").innerHTML='<div class="prompt-card"><h3>Choose what to study</h3><p>Choose a numbered learning document to focus on, or let ChatGPT help you find the right material.</p></div><div style="margin-top:15px"><select id="studySource" style="width:100%;padding:14px 13px;border-radius:13px;border:1px solid var(--line);background:var(--bg);color:var(--text)">'+options+'</select></div><div class="modal-actions"><button class="primary-btn" id="launchStudy">Start with ChatGPT ↗</button><button class="outline-btn" id="copyStudy">Copy study prompt</button></div><p style="font-size:11px;line-height:1.7;color:var(--muted);margin-top:16px">ChatGPT opens in a new tab. You may need to be signed in. It must be able to retrieve the source file to teach from it.</p>';$("modalBackdrop").classList.add("show");$("launchStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;state.selected=file;openChat(promptFor(mode,file));closeModal()};$("copyStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;copyText(promptFor(mode,file))}}
 function isStudyFile(f){const n=(f.name||"").toLowerCase(),p=(f.path||"").toLowerCase();if(["index.html","readme.md","llms.txt","library-index.json",".gitignore",".nojekyll","pages.yml"].includes(n)||p.startsWith(".github/")||n.endsWith(".css")||n.endsWith(".js")||n.endsWith(".yaml")||n.endsWith(".yml"))return false;return ["pptx","ppt","pdf","docx","doc","txt","md","rtf"].includes(extOf(f.name))}
-function filteredFiles(){return files.filter(f=>{if(!isStudyFile(f))return false;const ext=extOf(f.name);const filterOk=state.filter==="all"||(state.filter==="pptx"&&["pptx","ppt"].includes(ext))||(state.filter==="pdf"&&ext==="pdf")||(state.filter==="other"&&!["pptx","ppt","pdf"].includes(ext));const q=state.query.toLowerCase().trim();const code=fileId(f).toLowerCase();const searchText=(f.name+" "+f.path+" "+code+" file "+code+" id "+code).toLowerCase();const searchOk=!q||searchText.includes(q);return filterOk&&searchOk}).sort((a,b)=>a.name.localeCompare(b.name))}
+function filteredFiles(){return files.filter(f=>{if(!isStudyFile(f))return false;const ext=extOf(f.name);const filterOk=state.filter==="all"||(state.filter==="pptx"&&["pptx","ppt"].includes(ext))||(state.filter==="pdf"&&ext==="pdf")||(state.filter==="other"&&!["pptx","ppt","pdf"].includes(ext));const q=state.query.toLowerCase().trim();const code=fileId(f).toLowerCase();const searchText=(f.name+" "+f.path+" "+String(f.category||"")+" "+code+" file "+code+" id "+code).toLowerCase();const searchOk=!q||searchText.includes(q);return filterOk&&searchOk}).sort((a,b)=>a.name.localeCompare(b.name))}
 function renderFiles(){const shown=filteredFiles(),studyCount=files.filter(isStudyFile).length;$("libraryStatus").textContent=studyCount+" study materials · "+shown.length+" shown";$("artFileCount").textContent=studyCount+" files found";$("artFileSub").textContent=studyCount?"Ready when you are.":"Waiting for the files.";if(!shown.length){$("fileGrid").innerHTML='<div class="empty-state"><strong>No files on this shelf — yet.</strong>Try another search or upload material from your files. Website code is deliberately kept off these shelves.</div>';populatePromptSources();return}
 $("fileGrid").innerHTML=shown.map((f,i)=>{const ext=extOf(f.name),c=["#bd9577","#ad8668","#8f674c","#d2b39b"][i%4];let category=["ppt","pptx"].includes(ext)?"Presentation":ext==="pdf"?"PDF document":["doc","docx"].includes(ext)?"Document":"Study file";return '<button class="file-card" data-file="'+esc(f.path)+'" style="--file:'+c+';--filebg:'+c+'20"><div class="file-top"><div class="file-type">'+esc(iconFor(ext))+'</div><span class="file-menu" aria-hidden="true">↗</span></div><div class="file-name">'+esc(niceName(f.name))+'</div><div class="file-meta"><span>'+esc(category)+' · ID '+esc(fileId(f))+'</span><span class="tag">'+prettySize(f.size)+'</span></div><div class="file-attribution">'+(f.uploadedBy?'Uploaded by '+esc(f.uploadedBy):'Library study material')+'</div><span class="card-arrow">Open file ↗</span></button>'}).join("");
 document.querySelectorAll(".file-card").forEach(el=>el.addEventListener("click",()=>openFile(files.find(f=>f.path===el.dataset.file))));populatePromptSources()}
@@ -499,7 +500,7 @@ function openFile(file){if(!file)return;logAccountActivity("opened-file","Opened
 let preview="";if(ext==="pdf"){preview='<iframe class="reader-preview" title="PDF preview" src="'+esc(file.download_url)+'#toolbar=0"></iframe>'}else if(["ppt","pptx","doc","docx","xls","xlsx"].includes(ext)){const office="https://view.officeapps.live.com/op/embed.aspx?src="+encodeURIComponent(file.download_url);preview='<iframe class="reader-preview" title="Office preview" src="'+esc(office)+'" allowfullscreen></iframe><p style="font-size:11px;color:var(--muted);line-height:1.7">Office preview depends on Microsoft’s online viewer and may take a moment to load. Open the original file if the preview is unavailable.</p>'}else if(["txt","md","html","htm","rtf"].includes(ext)){preview='<div class="prompt-card"><p>Open or download the original file, or ask ChatGPT to explain it using the source link.</p></div>'}else{preview='<div class="prompt-card"><p>This file can be downloaded or sent to ChatGPT as a study source.</p></div>'}
 $("modalBody").innerHTML=preview+'<div class="modal-actions"><button class="primary-btn" id="fileLecture">Get a lecture ↗</button><button class="outline-btn" id="fileExam">Make an exam ↗</button><a class="outline-btn" style="display:inline-flex;align-items:center" href="'+esc(file.download_url)+'" target="_blank" rel="noopener">Download original ↗</a><button class="outline-btn" id="filePrompt">Copy study command</button></div><div class="prompt-card" style="margin-top:17px"><h3>Quiet study tip</h3><p>Read a section, close the file, then explain it in your own words. Use ChatGPT to fill gaps — not to replace the first attempt.</p></div>';
 $("modalBackdrop").classList.add("show");$("fileLecture").onclick=()=>{openChat(promptFor("lecture",file));closeModal()};$("fileExam").onclick=()=>{openChat(promptFor("exam",file));closeModal()};$("filePrompt").onclick=()=>copyText(promptFor("read",file))}
-async function loadFiles(silent=false){const btn=$("refreshBtn");if(!silent){btn.style.transform="rotate(180deg)";$("libraryStatus").textContent="Refreshing your study materials…"}try{const catalogue=await fetch("https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/library-index.json?refresh="+Date.now(),{cache:"no-store"});if(!catalogue.ok)throw new Error("Library catalogue returned "+catalogue.status);const index=await catalogue.json();if(!index||!Array.isArray(index.items))throw new Error("Library catalogue was not available");manifest.items=index.items.filter(item=>item&&item.kind==="study-material"&&item.path);files.splice(0,files.length,...manifest.items.map(item=>{const path=String(item.path),encodedPath=path.split("/").map(encodeURIComponent).join("/");return{name:item.name||path,path,size:Number(item.size)||0,uploadedBy:String(item.uploadedBy||""),html_url:"https://github.com/"+OWNER+"/"+REPO+"/blob/"+BRANCH+"/"+encodedPath,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath}}));renderFiles();renderPromptCards();$("lastSync").textContent="· Updated just now";$("libraryStatus").textContent="Your materials are up to date";$("statusPill").textContent="Shh… "+files.filter(isStudyFile).length+" study files, no rush"}catch(err){console.error(err);$("libraryStatus").textContent="Couldn’t refresh your materials";if(!files.length)$("fileGrid").innerHTML='<div class="empty-state"><strong>The shelves are being shy.</strong>Check your connection, then tap refresh.</div>';if(!silent)toast("Couldn’t load the library catalogue. Please try refreshing.")}finally{btn.style.transform=""}}
+async function loadFiles(silent=false){const btn=$("refreshBtn");if(!silent){btn.style.transform="rotate(180deg)";$("libraryStatus").textContent="Refreshing your study materials…"}try{const catalogue=await fetch("https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/library-index.json?refresh="+Date.now(),{cache:"no-store"});if(!catalogue.ok)throw new Error("Library catalogue returned "+catalogue.status);const index=await catalogue.json();if(!index||!Array.isArray(index.items))throw new Error("Library catalogue was not available");manifest.items=index.items.filter(item=>item&&item.kind==="study-material"&&item.path);files.splice(0,files.length,...manifest.items.map(item=>{const path=String(item.path),encodedPath=path.split("/").map(encodeURIComponent).join("/");return{name:item.name||path,path,size:Number(item.size)||0,uploadedBy:String(item.uploadedBy||""),category:String(item.category||""),html_url:"https://github.com/"+OWNER+"/"+REPO+"/blob/"+BRANCH+"/"+encodedPath,download_url:"https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+encodedPath}}));renderFiles();renderPromptCards();$("lastSync").textContent="· Updated just now";$("libraryStatus").textContent="Your materials are up to date";$("statusPill").textContent="Shh… "+files.filter(isStudyFile).length+" study files, no rush"}catch(err){console.error(err);$("libraryStatus").textContent="Couldn’t refresh your materials";if(!files.length)$("fileGrid").innerHTML='<div class="empty-state"><strong>The shelves are being shy.</strong>Check your connection, then tap refresh.</div>';if(!silent)toast("Couldn’t load the library catalogue. Please try refreshing.")}finally{btn.style.transform=""}}
 function fallbackCopy(text){const area=document.createElement("textarea");area.value=text;area.setAttribute("readonly","");area.style.position="fixed";area.style.left="-9999px";document.body.appendChild(area);area.select();let ok=false;try{ok=document.execCommand("copy")}catch(e){}area.remove();if(!ok)toast("Copy wasn't available here. Select and copy the prompt manually.");return ok}
 async function copyText(text){try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(text);toast("Copied to clipboard.");logAccountActivity("copied-prompt","Copied a study prompt");return true}}catch(e){}const ok=fallbackCopy(text);if(ok){toast("Copied to clipboard.");logAccountActivity("copied-prompt","Copied a study prompt")}return ok}
 const PROMPT_CARDS=[
@@ -518,7 +519,7 @@ function renderPromptCards(){const grid=$("promptGrid");if(!grid)return;grid.inn
 function makeReusablePrompt(type){const topic=($("promptTopic")&&$("promptTopic").value.trim())||"the topic I name in chat";const selectedId=$("promptFileId")&&$("promptFileId").value;const selectedFile=selectedId?files.find(f=>fileId(f)===selectedId):null;const source=selectedFile?"\nPlease focus on study file ID "+fileId(selectedFile)+", named \""+selectedFile.name+"\". Follow the study guide to open the exact learning document.":"\nPlease use the study guide to find suitable learning materials for the topic, show the file numbers and names, and ask me which one I want to use.";const tasks={read:"Teach me this topic in simple, accurate language. Define terms, explain mechanisms and relationships, preserve important source details, and finish with a recap and active-recall questions.",lecture:"Give me a complete, patient lecture. Start with objectives, teach step by step, use examples, pause with understanding checks, and finish with high-yield takeaways.",exam:"Create a challenging source-based exam. Ask ONE question at a time and wait for my answer. Do not show options or reveal the answer in advance unless I ask. Mark my response, explain gaps and keep score.",flashcards:"Create focused active-recall flashcards from the source, with concise answers and explanations where useful. Cover key definitions, mechanisms, classifications, presentation, assessment, management and complications where relevant.",clinical:"Create a realistic nursing case based on the topic. Reveal details in stages and ask what I assess or do next, explaining rationales and clearly separating a learning scenario from actual clinical advice.",summary:"Create readable exam-revision notes from the source with headings, definitions, essential comparisons, common exam traps and must-know points.",viva:"Conduct an oral-viva session with one open-ended question at a time. Probe my reasoning with follow-ups, avoid multiple-choice options, give feedback and revisit weak areas.",explain:"Explain the difficult parts using plain English, step-by-step cause-and-effect, examples and analogies. Check my understanding.",plan:"Create a realistic revision timetable based on the library’s learning materials, with short sessions, active recall, spaced repetition and checkpoints."};return basePrompt()+"\n\nTopic: "+topic+"."+source+"\n\nMy request: "+(tasks[type]||tasks.read)}
 function openUploadModal(){
  const cfg=window.LIBRARY_UPLOAD_CONFIG||{};
- if(!apiConfigured()){authState.afterAuthAction=null;openAuthModal();return}
+ if(!apiBase()){toast("The Library upload service is unavailable.");return}
  if(!authState.token||!authState.user){
   authState.afterAuthAction="upload";
   if(authState.token){toast("Checking your sign-in…");refreshAuth().then(()=>{if(authState.user)openUploadModal();else openAuthModal()})}
@@ -724,7 +725,7 @@ function openEasyUploadModal(cfg){
  $("modalKicker").textContent="ADD TO LIBRARY";
  $("modalTitle").textContent="Upload study files";
  $("modalDescription").textContent="Choose files. We’ll title them and add them to Library.";
- $("modalBody").innerHTML='<div class="upload-form"><div><label for="uploadFiles">Study files (up to four, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">Choose study files.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>Files can be seen and downloaded by anyone.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are genuine study materials.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload to Library ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
+ $("modalBody").innerHTML='<div class="upload-form"><div><label for="uploadFiles">Study files (up to four, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div style="margin-top:14px"><label for="uploadCategory">Collection name (optional)</label><input id="uploadCategory" maxlength="40" placeholder="e.g. Research, Nursing, Anatomy"></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">Choose study files.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>Files can be seen and downloaded by anyone.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are genuine study materials.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload to Library ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
  $("modalBackdrop").classList.add("show");
  $("cancelUpload").onclick=closeModal;
  $("uploadFiles").addEventListener("change",event=>{
@@ -735,10 +736,7 @@ function openEasyUploadModal(cfg){
  $("uploadSubmit").onclick=()=>handleEasyUpload(cfg);
  renderUploadPreview();syncUploadButton();
 }
-function buildUploadedFilesPrompt(uploaded){
- const ids=uploaded.map(item=>String(item.id).padStart(3,"0"));
- return basePrompt()+"\nStudy files "+ids.join(", ")+" together.";
-}
+function buildUploadedFilesPrompt(uploaded){const ids=uploaded.map(item=>String(item.id).padStart(3,"0"));return basePrompt()+"\nCollection: "+String(uploaded[0]&&uploaded[0].category||"Uncategorised")+"\nStudy files "+ids.join(", ")+" together."}
 async function handleEasyUpload(cfg){
  const ack=$("publicAck"),studyAck=$("studyAck"),button=$("uploadSubmit"),results=$("uploadResults");
  if(!uploadQueue.length){toast("Choose at least one study file.");return}
@@ -746,6 +744,7 @@ async function handleEasyUpload(cfg){
  if(!ack.checked){toast("Confirm that your files may be public.");return}
  if(!studyAck.checked){toast("Confirm these are study materials.");return}
  if(uploadQueue.some(item=>item.file.size<=0||item.file.size>8*1024*1024)){toast("Each file must be smaller than 8 MB.");return}
+ const category=String($("uploadCategory")&&$("uploadCategory").value||"").trim().slice(0,40)||"Uncategorised";
  if(!authState.token||!authState.user){closeModal();authState.afterAuthAction="upload";openAuthModal();return}
  if(uploadQueue.some(item=>item.review&&item.review.relevant===false)){toast("Remove files marked unrelated to study.");syncUploadButton();return}
  button.disabled=true;results.innerHTML="";
@@ -768,13 +767,13 @@ async function handleEasyUpload(cfg){
    form.append("files",item.file,uploadFinalFilename(item));
    reviewTokens.push(item.reviewToken);transcriptMeta.push({text:item.text||""});
   });
-  form.append("reviewTokens",JSON.stringify(reviewTokens));form.append("transcripts",JSON.stringify(transcriptMeta));
+  form.append("category",category);form.append("reviewTokens",JSON.stringify(reviewTokens));form.append("transcripts",JSON.stringify(transcriptMeta));
   const data=await uploadWithProgress(form),uploaded=data.files||[];
   uploaded.forEach(item=>{
-   const catalogueEntry={id:item.id,name:item.name,path:item.path,size:item.size,kind:"study-material",uploadedBy:String(item.uploadedBy||"Library member")};
+   const catalogueEntry={id:item.id,name:item.name,path:item.path,size:item.size,kind:"study-material",uploadedBy:String(item.uploadedBy||"Library member"),category:String(item.category||category)};
    if(item.transcriptPath)catalogueEntry.transcriptPath=item.transcriptPath;
    manifest.items.push(catalogueEntry);
-   files.push({name:item.name,path:item.path,size:item.size,uploadedBy:String(item.uploadedBy||"Library member"),download_url:item.download_url,html_url:item.download_url,transcriptPath:item.transcriptPath||""});
+   files.push({name:item.name,path:item.path,size:item.size,uploadedBy:String(item.uploadedBy||"Library member"),category:String(item.category||category),download_url:item.download_url,html_url:item.download_url,transcriptPath:item.transcriptPath||""});
   });
   renderFiles();renderPromptCards();
   uploadDone=true;uploadQueue=[];uploadReviewDone=false;
@@ -815,43 +814,19 @@ function startPopupSequence(){if(!showPopupThisVisit)return;setTimeout(openOffic
 function closeWelcome(){state.welcomeDone=true;localStorage.setItem("library-welcome","1");$("welcomeBackdrop").classList.remove("show")}
 function updateNavIndicator(view){const nav=document.querySelector(".bottom-nav"),indicator=$("navIndicator"),active=nav&&nav.querySelector('[data-nav="'+view+'"]');if(!nav||!indicator||!active)return;indicator.style.width=active.offsetWidth+"px";indicator.style.transform="translateX("+active.offsetLeft+"px)"} function gotoSection(id){const view=["home","library","prompts","you"].includes(id)?id:"home";const visible=view==="home"?["home","study","homeMore"]:[view];["home","study","homeMore","library","prompts","you"].forEach(name=>{const element=$(name);if(element){element.classList.toggle("view-hidden",!visible.includes(name));if(visible.includes(name)){element.classList.remove("view-enter");void element.offsetWidth;element.classList.add("view-enter")}}});const footer=$("quietFooter");if(footer)footer.classList.toggle("view-hidden",view!=="home");document.querySelectorAll(".nav-item[data-nav]").forEach(n=>{const active=n.dataset.nav===view;n.classList.toggle("active",active);if(active)n.setAttribute("aria-current","page");else n.removeAttribute("aria-current")});document.documentElement.dataset.view=view;updateNavIndicator(view);if(view==="library")logAccountActivity("viewed-library","Opened the Library shelf");if(view==="you"){renderAccountPanel();if(authState.token&&authState.user)refreshDashboard()}window.scrollTo({top:0,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
 
-function apiBase(){const cfg=window.LIBRARY_UPLOAD_CONFIG||{};return String(cfg.endpoint||"").trim().replace(/\/+$/,"")}
-function apiConfigured(){const cfg=window.LIBRARY_UPLOAD_CONFIG||{};return Boolean(apiBase()&&cfg.turnstileSiteKey)}
+function apiBase(){const c=window.LIBRARY_UPLOAD_CONFIG||{};return String(c.endpoint||"").trim().replace(/\/+$/,"")}
+function supabaseAuthConfigured(){const c=window.LIBRARY_UPLOAD_CONFIG||{};return Boolean(c.supabaseUrl&&c.supabasePublishableKey)}
+async function sb(path,method="GET",body,token=authState.token){
+ const c=window.LIBRARY_UPLOAD_CONFIG||{},h=new Headers({apikey:c.supabasePublishableKey,Accept:"application/json"});
+ if(token)h.set("Authorization","Bearer "+token);if(body!==undefined)h.set("Content-Type","application/json");
+ const r=await fetch(String(c.supabaseUrl||"").replace(/\/+$/,"")+"/auth/v1/"+path,{method,headers:h,body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
+ const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.msg||d.message||d.error_description||d.error||("Auth error "+r.status));return d;
+}
+function normUser(u){if(!u)return null;const m=u.user_metadata||{},email=String(u.email||"");return{id:String(u.id||""),email,displayName:String(m.display_name||m.full_name||m.name||email.split("@")[0]||"Student"),createdAt:u.created_at?Math.floor(new Date(u.created_at).getTime()/1000):Math.floor(Date.now()/1000)}}
+function saveSupaSession(v){if(!v||!v.access_token)throw Error("Supabase did not return a sign-in session.");authState.token=v.access_token;authState.refreshToken=v.refresh_token||authState.refreshToken;authState.tokenExpiresAt=(Number(v.expires_at)||Math.floor(Date.now()/1000)+(Number(v.expires_in)||3600))*1000;if(v.user)authState.user=normUser(v.user);localStorage.setItem("library-supabase-session",JSON.stringify({access_token:authState.token,refresh_token:authState.refreshToken,expires_at:Math.floor(authState.tokenExpiresAt/1000)}))}
+async function currentAccessToken(){if(!authState.token&&authState.refreshToken){const x=await sb("token?grant_type=refresh_token","POST",{refresh_token:authState.refreshToken},"");saveSupaSession(x)}if(authState.tokenExpiresAt&&Date.now()>authState.tokenExpiresAt-60000){const x=await sb("token?grant_type=refresh_token","POST",{refresh_token:authState.refreshToken},"");saveSupaSession(x)}return authState.token||""}
+async function apiFetch(path,options={}){const b=apiBase();if(!b)throw Error("The Library file service is temporarily unavailable.");const h=new Headers(options.headers||{}),t=await currentAccessToken();if(t)h.set("Authorization","Bearer "+t);if(options.body&&typeof options.body==="string"&&!h.has("Content-Type"))h.set("Content-Type","application/json");const r=await fetch(b+path,{...options,headers:h}),d=await r.json().catch(()=>({}));if(!r.ok){const e=Error(d.error||("Library service returned "+r.status));e.status=r.status;throw e}return d}
 function logAccountActivity(kind,detail){if(!authState.token||!apiBase())return;apiFetch("/auth/activity",{method:"POST",body:JSON.stringify({kind,detail})}).catch(()=>{})}
-async function apiFetch(path,options={}){
- const base=apiBase();if(!base)throw new Error("Personal Library sign-in has not been connected yet. The Cloudflare setup still needs to be completed.");
- const headers=new Headers(options.headers||{});
- if(authState.token)headers.set("Authorization","Bearer "+authState.token);
- if(options.body&&typeof options.body==="string"&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
- const res=await fetch(base+path,{...options,headers});
- const data=await res.json().catch(()=>({}));
- if(!res.ok){const e=new Error(data.error||("The Library service returned "+res.status));e.status=res.status;throw e}
- return data;
-}
-function ensureTurnstileLoaded(){
- if(window.turnstile)return Promise.resolve(window.turnstile);
- if(turnstileLoadPromise)return turnstileLoadPromise;
- turnstileLoadPromise=new Promise((resolve,reject)=>{
-  let script=document.getElementById("turnstileScript");
-  if(!script){script=document.createElement("script");script.id="turnstileScript";script.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";script.async=true;script.defer=true;document.head.appendChild(script)}
-  const loaded=()=>window.turnstile?resolve(window.turnstile):reject(new Error("The human-check service could not be loaded."));
-  const failed=()=>reject(new Error("The human-check service could not be loaded. Check your internet connection."));
-  script.addEventListener("load",loaded,{once:true});script.addEventListener("error",failed,{once:true});
-  if(window.turnstile)resolve(window.turnstile);
- });
- return turnstileLoadPromise;
-}
-function installTurnstile(containerId,siteKey,onError){
- let widgetId=null;
- const container=$(containerId);
- if(!container)return ()=>"";
- ensureTurnstileLoaded().then(api=>{
-  if(!document.getElementById(containerId))return;
-  container.innerHTML="";
-  widgetId=api.render("#"+containerId,{sitekey:siteKey,callback:()=>{}, "expired-callback":()=>{}, "error-callback":()=>{if(onError)onError("The human-check expired. Please try again.")}});
- }).catch(err=>{if(onError)onError(err.message)});
- return {getResponse:()=>window.turnstile&&widgetId!==null?window.turnstile.getResponse(widgetId):"",reset:()=>{if(window.turnstile&&widgetId!==null)window.turnstile.reset(widgetId)}};
-}
 function formatAccountDate(value){
  if(!value)return "Just now";
  const n=Number(value);const date=new Date(Number.isFinite(n)&&n>0&&n<1000000000000?n*1000:value);
@@ -865,8 +840,8 @@ async function toggleDailyReminders(){const button=$("toggleDailyPushBtn"),statu
 async function savePushReminderTime(){if(!state.pushEnabled)return;const select=$("pushReminderTime");if(!select)return;try{const reg=await currentServiceWorkerRegistration();const subscription=await reg.pushManager.getSubscription();if(!subscription)return;const timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Banjul";const result=await apiFetch("/push/subscribe",{method:"POST",body:JSON.stringify({subscription:subscription.toJSON(),reminderTime:select.value,timeZone})});state.pushTime=result.reminderTime||select.value;const status=$("pushReminderStatus");if(status)status.textContent="Enabled · reminders arrive at "+state.pushTime+" in "+timeZone+".";toast("Your daily reminder time has been updated.");}catch(error){toast("Could not update reminder time: "+error.message)}}
 function renderAccountPanel(){
  const panel=$("accountPanel");if(!panel)return;
- if(!apiBase()){
-  panel.innerHTML='<article class="account-signedout"><div class="account-topline"><div class="account-avatar">✳</div><div class="account-ident"><div class="eyebrow">YOUR PERSONAL LIBRARY</div><h3>Make this space yours.</h3><p>Sign in to keep track of your uploads and manage your Library profile.</p><span class="account-badge">Cloudflare setup pending</span></div></div><div class="account-actions"><button class="primary-btn" id="signInBtn">Sign in / Create account</button><button class="outline-btn" id="accountGuideBtn">Study guide ↗</button></div></article>';
+ if(!supabaseAuthConfigured()){
+  panel.innerHTML='<article class="account-signedout"><div class="account-topline"><div class="account-avatar">✳</div><div class="account-ident"><div class="eyebrow">YOUR PERSONAL LIBRARY</div><h3>Make this space yours.</h3><p>Sign in to keep track of your uploads and manage your Library profile.</p><span class="account-badge">Sign-in unavailable</span></div></div><div class="account-actions"><button class="primary-btn" id="signInBtn">Sign in / Create account</button><button class="outline-btn" id="accountGuideBtn">Study guide ↗</button></div></article>';
   $("signInBtn").addEventListener("click",openAuthModal);
   $("accountGuideBtn").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));
   return;
@@ -905,7 +880,7 @@ function openMePopup(kind){
   body='<div class="me-popup-list account-activity-list">'+activityRows+'</div><div class="modal-actions"><button class="outline-btn" id="mePopupClose">Done</button></div>';
  }else if(kind==="profile"){
   kicker="ACCOUNT DETAILS";title="Profile";description="Update the name shown in your Library.";
-  body='<div class="me-popup-section"><div class="me-popup-label">Email address</div><div class="me-account-value">'+esc(user&&user.email||"")+'</div><div class="me-popup-label" style="margin-top:15px">Display name</div><div class="account-edit me-profile-edit"><input id="accountNameInput" maxlength="50" value="'+esc(user&&user.displayName||"")+'" aria-label="Your display name" placeholder="Your display name"><button class="primary-btn" id="saveAccountName">Save name</button></div><div class="me-popup-label" style="margin-top:15px">Sign-in password</div><div class="account-edit me-profile-edit"><input id="accountNewPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-label="New sign-in password" placeholder="At least 8 characters"><button class="primary-btn" id="saveAccountPassword" type="button">Save password</button></div><p class="auth-note">Older accounts can set a password here while still signed in. Passwords replace emailed sign-in codes.</p><p class="auth-note">Member since '+esc(formatAccountDate(user&&user.createdAt))+'</p></div><div class="modal-actions"><button class="outline-btn" id="mePopupClose">Done</button></div>';
+  body='<div class="me-popup-section"><div class="me-popup-label">Email address</div><div class="me-account-value">'+esc(user&&user.email||"")+'</div><div class="me-popup-label" style="margin-top:15px">Display name</div><div class="account-edit me-profile-edit"><input id="accountNameInput" maxlength="50" value="'+esc(user&&user.displayName||"")+'" aria-label="Your display name" placeholder="Your display name"><button class="primary-btn" id="saveAccountName">Save name</button></div><div class="me-popup-label" style="margin-top:15px">Sign-in password</div><div class="account-edit me-profile-edit"><input id="accountNewPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" aria-label="New sign-in password" placeholder="At least 8 characters"><button class="primary-btn" id="saveAccountPassword" type="button">Save password</button></div><p class="auth-note">Change your Supabase sign-in password here.</p><p class="auth-note">Member since '+esc(formatAccountDate(user&&user.createdAt))+'</p></div><div class="modal-actions"><button class="outline-btn" id="mePopupClose">Done</button></div>';
  }else if(kind==="preferences"){
   kicker="MAKE IT YOURS";title="Preferences";description="Choose how Library looks and when it nudges you to study.";
   body='<section class="me-popup-section"><div class="me-preference-row"><div class="me-preference-copy"><strong>Appearance</strong><p>Switch between light and dark themes.</p></div><button class="outline-btn" id="profileThemePopupBtn">'+(state.theme==="light"?"Use dark theme":"Use light theme")+'</button></div><div class="me-preference-row"><div class="me-preference-copy"><strong>Refresh Library</strong><p>Load the latest files from the shelf.</p></div><button class="outline-btn" id="profileRefreshPopupBtn">Refresh files ↻</button></div></section><section class="me-popup-section"><div class="me-preference-copy"><strong>Daily study reminder</strong><p>Get one gentle browser reminder each day.</p></div><div class="me-reminder-controls"><label for="pushReminderTime">Reminder time</label><select class="filter" id="pushReminderTime" aria-label="Daily reminder time"><option value="08:00">8:00 AM</option><option value="12:00">12:00 PM</option><option value="18:00">6:00 PM</option><option value="20:00">8:00 PM</option></select><button class="outline-btn" id="toggleDailyPushBtn">Enable daily reminders ↗</button></div><p class="push-reminder-status" id="pushReminderStatus">Check reminder status…</p></section><div class="modal-actions"><button class="outline-btn" id="mePopupClose">Done</button></div>';
@@ -925,93 +900,33 @@ function toggleLibraryTheme(){
  localStorage.setItem("library-theme",state.theme);
  applyTheme();
 }
-async function refreshDashboard(){
- if(!authState.token||!authState.user){renderAccountPanel();return}
- const status=$("accountStatus");if(status)status.textContent="Refreshing your dashboard…";
- try{const result=await apiFetch("/auth/dashboard");authState.dashboard=result;renderAccountPanel()}
- catch(err){if(err.status===401){clearAccountSession();renderAccountPanel();toast("Please sign in again.")}else{const current=$("accountStatus");if(current)current.textContent="Your account is signed in, but the dashboard could not refresh: "+err.message}}
-}
-async function refreshAuth(){
- if(!authState.token||!apiBase()){if(!apiBase()){authState.token="";localStorage.removeItem("library-session-token")}authState.user=null;authState.dashboard=null;renderAccountPanel();return}
- try{const result=await apiFetch("/auth/me");authState.user=result.user;state.name=result.user.displayName||"";localStorage.setItem("library-name",state.name);if(document.documentElement.dataset.view==="you")await refreshDashboard();else renderAccountPanel()}
- catch(err){if(err.status===401){clearAccountSession();renderAccountPanel()}else{renderAccountPanel();console.warn("Personal Library sign-in check failed",err)}}
-}
-function clearAccountSession(){authState.token="";authState.user=null;authState.dashboard=null;localStorage.removeItem("library-session-token")}
-async function saveAccountName(){
- const input=$("accountNameInput");if(!input)return;const displayName=input.value.trim();if(displayName.length<2){toast("Use at least two characters for your name.");input.focus();return}
- const button=$("saveAccountName");if(button){button.disabled=true;button.textContent="Saving…"}
- try{
-  const result=await apiFetch("/auth/me",{method:"PATCH",body:JSON.stringify({displayName})});
-  authState.user=result.user;state.name=result.user.displayName;localStorage.setItem("library-name",state.name);
-  input.value=result.user.displayName||displayName;
-  if(button){button.disabled=false;button.textContent="Saved ✓"}
-  toast("Your Library name has been updated.");
-  await refreshDashboard();
- }catch(err){
-  toast(err.message);
-  if(button){button.disabled=false;button.textContent="Save name"}
- }
-}
-async function saveAccountPassword(){
- const input=$("accountNewPassword");if(!input)return;const password=input.value;
- if(password.length<8||password.length>128){toast("Choose a password between 8 and 128 characters.");input.focus();return}
- const button=$("saveAccountPassword");if(button){button.disabled=true;button.textContent="Saving…"}
- try{
-  await apiFetch("/auth/password",{method:"POST",body:JSON.stringify({password})});
-  input.value="";if(button){button.disabled=false;button.textContent="Saved ✓"}
-  toast("Your sign-in password has been saved.");
- }catch(err){toast(err.message);if(button){button.disabled=false;button.textContent="Save password"}}
-}
-async function signOutAccount(){
- const oldToken=authState.token;try{if(oldToken&&apiBase()){await fetch(apiBase()+"/auth/logout",{method:"POST",headers:{Authorization:"Bearer "+oldToken}})}}catch{}
- clearAccountSession();renderAccountPanel();toast("You’re signed out. Your public study files remain available.");
-}
+async function refreshDashboard(){if(!authState.token||!authState.user){renderAccountPanel();return}try{authState.dashboard=await apiFetch("/auth/dashboard");renderAccountPanel()}catch(e){const s=$("accountStatus");if(s)s.textContent="Could not refresh uploads: "+e.message}}
+async function refreshAuth(){if(!supabaseAuthConfigured()||(!authState.token&&!authState.refreshToken)){renderAccountPanel();return}try{await currentAccessToken();const u=await sb("user","GET",undefined,authState.token);authState.user=normUser(u);try{const p=await apiFetch("/auth/me");if(p.user){authState.user.displayName=p.user.displayName||authState.user.displayName;authState.user.createdAt=p.user.createdAt||authState.user.createdAt}}catch(e){}state.name=authState.user.displayName;localStorage.setItem("library-name",state.name);if(document.documentElement.dataset.view==="you")await refreshDashboard();else renderAccountPanel()}catch(e){clearAccountSession();renderAccountPanel()}}
+function clearAccountSession(){authState.token="";authState.refreshToken="";authState.tokenExpiresAt=0;authState.user=null;authState.dashboard=null;localStorage.removeItem("library-supabase-session");localStorage.removeItem("library-session-token")}
+async function saveAccountName(){const input=$("accountNameInput");if(!input)return;const name=input.value.trim();if(name.length<2){toast("Use at least two characters.");return}const btn=$("saveAccountName");if(btn){btn.disabled=true;btn.textContent="Saving…"}try{const u=await sb("user","PUT",{data:{display_name:name}},await currentAccessToken());authState.user={...normUser(u.user||u),displayName:name};state.name=name;localStorage.setItem("library-name",name);try{await apiFetch("/auth/me",{method:"PATCH",body:JSON.stringify({displayName:name})})}catch(e){}input.value=name;if(btn){btn.disabled=false;btn.textContent="Saved ✓"}toast("Your Library name has been updated.");await refreshDashboard()}catch(e){toast(e.message);if(btn){btn.disabled=false;btn.textContent="Save name"}}}
+async function saveAccountPassword(){const input=$("accountNewPassword");if(!input)return;const password=input.value;if(password.length<8||password.length>128){toast("Choose a password between 8 and 128 characters.");return}const btn=$("saveAccountPassword");if(btn){btn.disabled=true;btn.textContent="Saving…"}try{await sb("user","PUT",{password},await currentAccessToken());input.value="";if(btn){btn.disabled=false;btn.textContent="Saved ✓"}toast("Your sign-in password has been updated.")}catch(e){toast(e.message);if(btn){btn.disabled=false;btn.textContent="Save password"}}}
+async function signOutAccount(){try{if(authState.token)await sb("logout?scope=local","POST",{},await currentAccessToken())}catch(e){}clearAccountSession();renderAccountPanel();toast("You’re signed out.")}
 function openAuthModal(){
- if(!apiConfigured())authState.afterAuthAction=null;
- $("modalKicker").textContent="YOUR PERSONAL LIBRARY";$("modalTitle").textContent="Sign in to your Library";$("modalDescription").textContent="Use your email and password. No email code or confirmation is needed.";
- if(!apiConfigured()){
-  $("modalBody").innerHTML='<div class="auth-config-note"><b>Almost ready.</b><br>Personal sign-in is prepared, but the Cloudflare service URL and public Turnstile site key still need to be set by the Library owner. You can browse the study files in the meantime.</div><div class="modal-actions"><button class="outline-btn" id="authClose">Close</button><a class="outline-btn" href="https://github.com/squashberry/Read/tree/master/upload-worker" target="_blank" rel="noopener">Setup guide ↗</a></div>';
-  $("modalBackdrop").classList.add("show");$("authClose").onclick=closeModal;return;
- }
- $("modalBody").innerHTML='<div class="upload-form"><div id="authNameGroup"><label for="authDisplayName">Your name</label><input id="authDisplayName" maxlength="50" autocomplete="name" placeholder="What should we call you?"></div><div style="margin-top:12px"><label for="authEmail">Email address</label><input id="authEmail" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></div><div style="margin-top:12px"><label for="authPassword">Password</label><input id="authPassword" type="password" minlength="8" maxlength="128" autocomplete="current-password" placeholder="At least 8 characters" required></div><div id="authCaptchaBlock" style="margin-top:14px"><label>Quick safety check</label><div id="authTurnstile"></div></div><p id="authStatus" class="auth-note" aria-live="polite">Sign in with your email and password, or create an account in a few seconds.</p><div class="modal-actions"><button class="primary-btn" id="authSubmitBtn" type="button">Sign in ↗</button><button class="outline-btn" id="authCancelBtn" type="button">Cancel</button></div><button class="share-dismiss" id="authModeToggle" type="button">New here? Create an account</button><p class="auth-note">Use a password you do not use elsewhere. Uploaded study files are public and may be downloaded by anyone.</p></div>';
- $("modalBackdrop").classList.add("show");$("authCancelBtn").onclick=closeModal;
- let widget=null,mode="signin";
- const failure=msg=>{const box=$("authStatus");if(box)box.textContent=msg};
- const setMode=next=>{
-  mode=next;
-  const signup=mode==="signup";
-  $("modalTitle").textContent=signup?"Create your Library account":"Sign in to your Library";
-  $("modalDescription").textContent=signup?"Create your account with an email and password. No email confirmation is required.":"Sign in with your email and password. No email code or confirmation is needed.";
-  $("authNameGroup").style.display=signup?"block":"none";
-  $("authDisplayName").required=signup;
-  $("authPassword").autocomplete=signup?"new-password":"current-password";
-  $("authSubmitBtn").textContent=signup?"Create account ↗":"Sign in ↗";
-  $("authModeToggle").textContent=signup?"Already have an account? Sign in":"New here? Create an account";
-  failure(signup?"Choose a display name and a password of at least 8 characters.":"Enter your email and password to continue.");
- };
- setMode("signin");
- ensureTurnstileLoaded().then(api=>{if(!$("authTurnstile"))return;widget=api.render("#authTurnstile",{sitekey:(window.LIBRARY_UPLOAD_CONFIG||{}).turnstileSiteKey,callback:()=>{}, "expired-callback":()=>failure("The safety check expired. Please complete it again."),"error-callback":()=>failure("The safety check did not load. Please refresh and try again.")})}).catch(err=>failure(err.message));
- $("authModeToggle").onclick=()=>{setMode(mode==="signin"?"signup":"signin");if(window.turnstile&&widget!==null)window.turnstile.reset(widget)};
+ $("modalKicker").textContent="YOUR PERSONAL LIBRARY";$("modalTitle").textContent="Sign in to your Library";$("modalDescription").textContent="Use your email and password.";
+ if(!supabaseAuthConfigured()){$("modalBody").innerHTML='<p class="auth-note">Library sign-in is not configured. Please try again later.</p><div class="modal-actions"><button class="outline-btn" id="authClose">Close</button></div>';$("modalBackdrop").classList.add("show");$("authClose").onclick=closeModal;return}
+ $("modalBody").innerHTML='<div class="upload-form"><div id="authNameGroup"><label for="authDisplayName">Your name</label><input id="authDisplayName" maxlength="50" placeholder="What should we call you?"></div><div style="margin-top:12px"><label for="authEmail">Email address</label><input id="authEmail" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com"></div><div style="margin-top:12px"><label for="authPassword">Password</label><input id="authPassword" type="password" minlength="8" maxlength="128" autocomplete="current-password" placeholder="At least 8 characters"></div><p id="authStatus" class="auth-note" aria-live="polite">Sign in or create a free account.</p><div class="modal-actions"><button class="primary-btn" id="authSubmitBtn">Sign in ↗</button><button class="outline-btn" id="authCancelBtn">Cancel</button></div><button class="share-dismiss" id="authModeToggle">New here? Create an account</button></div>';
+ $("modalBackdrop").classList.add("show");$("authCancelBtn").onclick=closeModal;let mode="signin";
+ const status=t=>{$("authStatus").textContent=t},isNew=()=>mode==="signup";
+ const setMode=()=>{$("modalTitle").textContent=isNew()?"Create your Library account":"Sign in to your Library";$("authNameGroup").style.display=isNew()?"block":"none";$("authDisplayName").required=isNew();$("authPassword").autocomplete=isNew()?"new-password":"current-password";$("authSubmitBtn").textContent=isNew()?"Create account ↗":"Sign in ↗";$("authModeToggle").textContent=isNew()?"Already have an account? Sign in":"New here? Create an account"};
+ setMode();$("authModeToggle").onclick=()=>{mode=isNew()?"signin":"signup";setMode()};
  $("authSubmitBtn").onclick=async()=>{
-  const button=$("authSubmitBtn"),email=$("authEmail").value.trim().toLowerCase(),password=$("authPassword").value,displayName=$("authDisplayName").value.trim();
-  const captcha=window.turnstile&&widget!==null?window.turnstile.getResponse(widget):"";
-  if(email.indexOf("@")<1||email.lastIndexOf(".")<email.indexOf("@")+2){failure("Enter a valid email address first.");$("authEmail").focus();return}
-  if(mode==="signup"&&displayName.length<2){failure("Enter a display name with at least two characters.");$("authDisplayName").focus();return}
-  if(password.length<8||password.length>128){failure("Choose a password between 8 and 128 characters.");$("authPassword").focus();return}
-  if(!captcha){failure(widget===null?"The safety check is still loading. Wait a moment and try again.":"Please complete the human-check box, then try again.");return}
-  button.disabled=true;button.textContent=mode==="signup"?"Creating account…":"Signing in…";
+  const btn=$("authSubmitBtn"),email=$("authEmail").value.trim().toLowerCase(),password=$("authPassword").value,name=$("authDisplayName").value.trim();
+  if(email.indexOf("@")<1){status("Enter a valid email address.");return}if(isNew()&&name.length<2){status("Enter your name.");return}if(password.length<8||password.length>128){status("Use a password with at least 8 characters.");return}
+  btn.disabled=true;btn.textContent=isNew()?"Creating account…":"Signing in…";
   try{
-   const result=await apiFetch(mode==="signup"?"/auth/signup":"/auth/login",{method:"POST",body:JSON.stringify({email,password,displayName,captcha})});
-   authState.token=result.token;authState.user=result.user;authState.dashboard=null;localStorage.setItem("library-session-token",result.token);
-   state.name=result.user.displayName||displayName||result.user.email.split("@")[0];localStorage.setItem("library-name",state.name);
-   const nextAction=authState.afterAuthAction;authState.afterAuthAction=null;$("modalBackdrop").classList.remove("show");
-   toast(mode==="signup"?"Your Library account is ready, "+state.name+".":"Welcome back, "+state.name+".");renderAccountPanel();
-   if(nextAction==="upload"){setTimeout(openUploadModal,120)}else{await refreshDashboard()}
-  }catch(err){failure(err.message);button.disabled=false;button.textContent=mode==="signup"?"Create account ↗":"Sign in ↗";if(window.turnstile&&widget!==null)window.turnstile.reset(widget);return}
-  button.disabled=false;
+   let d;if(isNew()){d=await sb("signup","POST",{email,password,data:{display_name:name}});if(!d.access_token&&!d.session)d=await sb("token?grant_type=password","POST",{email,password},"")}else d=await sb("token?grant_type=password","POST",{email,password},"");
+   saveSupaSession(d.session||d);if(!authState.user){const u=await sb("user","GET",undefined,authState.token);authState.user=normUser(u)}
+   if(isNew()&&name)authState.user.displayName=name;state.name=authState.user.displayName;localStorage.setItem("library-name",state.name);
+   try{const p=await apiFetch("/auth/me");if(p.user){authState.user.displayName=p.user.displayName||state.name;authState.user.createdAt=p.user.createdAt||authState.user.createdAt}}catch(e){console.warn("Profile sync pending",e)}
+   const next=authState.afterAuthAction;authState.afterAuthAction=null;$("modalBackdrop").classList.remove("show");renderAccountPanel();toast(isNew()?"Your Library account is ready.":"Welcome back, "+state.name+".");if(next==="upload")setTimeout(openUploadModal,120);else await refreshDashboard();
+  }catch(e){status(e.message||"Sign-in failed.");btn.disabled=false;btn.textContent=isNew()?"Create account ↗":"Sign in ↗";return}btn.disabled=false;
  };
 }
-
 function isLibraryInstalled(){return Boolean((window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true||(document.referrer||"").startsWith("android-app://"))}
 function hideInstallBanner(){const banner=$("installBanner");if(!banner)return;clearTimeout(banner.timer);banner.classList.remove("show");banner.classList.add("leaving")}
 function showInstallBanner(){const banner=$("installBanner");if(!banner||isLibraryInstalled()||popupVisitCount%3!==2||localStorage.getItem("library-install-nudge-shown")==="1")return;setTimeout(()=>{if(isLibraryInstalled())return;localStorage.setItem("library-install-nudge-shown","1");banner.classList.remove("leaving");banner.classList.add("show");clearTimeout(banner.timer);banner.timer=setTimeout(hideInstallBanner,20000)},650)}
