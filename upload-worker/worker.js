@@ -65,6 +65,21 @@ function cleanLibraryTitle(value, fallback = "Study material") {
     .replace(/\s+/g, " ").trim().slice(0, 90);
   return title || String(fallback || "Study material").slice(0, 90);
 }
+async function verifyHmacHex(secret, value, signatureHex) {
+  if (typeof signatureHex !== "string" || !/^[a-f0-9]{64}$/i.test(signatureHex)) return false;
+  const signature = new Uint8Array(32);
+  for (let i = 0; i < signature.length; i++) {
+    signature[i] = Number.parseInt(signatureHex.slice(i * 2, i * 2 + 2), 16);
+  }
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    {name:"HMAC",hash:"SHA-256"},
+    false,
+    ["verify"]
+  );
+  return crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(value));
+}
 async function signReviewPayload(payload, secret) {
   const encoded = base64UrlEncode(new TextEncoder().encode(JSON.stringify(payload)));
   return encoded + "." + await hmacHex(secret, encoded);
@@ -72,7 +87,7 @@ async function signReviewPayload(payload, secret) {
 async function readReviewPayload(token, secret) {
   const pieces = String(token || "").split(".");
   if (pieces.length !== 2 || !pieces[0] || !pieces[1]) return null;
-  if (!timingSafeEqual(await hmacHex(secret, pieces[0]), pieces[1])) return null;
+  if (!(await verifyHmacHex(secret, pieces[0], pieces[1]))) return null;
   try {
     return JSON.parse(new TextDecoder().decode(base64UrlDecode(pieces[0])));
   } catch { return null; }

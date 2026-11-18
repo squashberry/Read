@@ -40,7 +40,7 @@ jobs:
             'id="navIndicator"', 'function updateNavIndicator', 'id="shareBackdrop"',
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
-            'apiFetch(mode==="signup"?"/auth/signup":"/auth/login"', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
+            'sb("signup","POST",{email,password,data:{display_name:name}})', 'sb("token?grant_type=password","POST",{email,password},"")', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
             'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
@@ -113,11 +113,33 @@ jobs:
           if (uploadHandlerStart < 0 || uploadHandlerEnd < 0 || worker.slice(uploadHandlerStart, uploadHandlerEnd).includes('verifyTurnstile')) {
             throw new Error('File uploads must not require the sign-in Turnstile widget');
           }
-          if (!worker.includes('TURNSTILE_SECRET_KEY') || !worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
-              !worker.includes('/auth/signup') || !worker.includes('/auth/login') || !worker.includes('/auth/password') || !worker.includes('/auth/me') || !worker.includes('/auth/dashboard') ||
-              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') || !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('titleConfirmationFallback') || !worker.includes('user-agent')) {
-            throw new Error('Upload Worker is missing authentication or upload safety controls');
+          if (!worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
+              !worker.includes('SUPABASE_URL') || !worker.includes('SUPABASE_PUBLISHABLE_KEY') ||
+              !worker.includes('/auth/me') || !worker.includes('/auth/dashboard') ||
+              !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') ||
+              !worker.includes('async scheduled(controller,env,ctx)') || !worker.includes('titleConfirmationFallback') ||
+              !worker.includes('user-agent') || !worker.includes('async function verifyHmacHex(') ||
+              !worker.includes('crypto.subtle.verify("HMAC"') ||
+              !worker.includes('await verifyHmacHex(secret, pieces[0], pieces[1])') || worker.includes('timingSafeEqual(')) {
+            throw new Error('Upload Worker is missing Supabase auth, upload safety, or Workers-compatible review-token verification');
           }
+          const verifyStart = worker.indexOf('async function verifyHmacHex(');
+          const verifyEnd = worker.indexOf('\nasync function signReviewPayload(', verifyStart);
+          if (verifyStart < 0 || verifyEnd < 0) throw new Error('Workers Web Crypto review verifier could not be isolated');
+          const verifierSource = worker.slice(verifyStart, verifyEnd);
+          const verifyHmacHex = new Function('crypto', 'TextEncoder', verifierSource + '; return verifyHmacHex;')(require('node:crypto').webcrypto, TextEncoder);
+          (async () => {
+            const testCrypto = require('node:crypto').webcrypto;
+            const secret = 'library-upload-review-test-secret';
+            const payload = 'review-token-payload';
+            const key = await testCrypto.subtle.importKey('raw', new TextEncoder().encode(secret), {name:'HMAC',hash:'SHA-256'}, false, ['sign']);
+            const signature = await testCrypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+            const signatureHex = Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2,'0')).join('');
+            if (!await verifyHmacHex(secret, payload, signatureHex)) throw new Error('Valid review-token HMAC was rejected');
+            if (await verifyHmacHex(secret, payload + '-tampered', signatureHex)) throw new Error('Tampered review-token payload was accepted');
+            if (await verifyHmacHex(secret, payload, 'not-a-signature')) throw new Error('Malformed review-token signature was accepted');
+            console.log('Workers Web Crypto review-token verification: OK');
+          })().catch(error => { console.error(error); process.exitCode = 1; });
           const schema = fs.readFileSync('upload-worker/schema.sql', 'utf8');
           if (!schema.includes('password_salt TEXT') || !schema.includes('password_hash TEXT')) throw new Error('D1 schema is missing password authentication columns');
           const passwordMigration = fs.readFileSync('upload-worker/migrations/0002_password_auth.sql', 'utf8');
@@ -134,8 +156,10 @@ jobs:
           if (uploadSectionStart < 0 || uploadSectionEnd < 0 || /turnstile|captcha/i.test(html.slice(uploadSectionStart, uploadSectionEnd))) {
             throw new Error('The uploader must not load or require Cloudflare Turnstile');
           }
-          if (!html.includes('id="authTurnstile"') || !html.includes('apiFetch(mode==="signup"?"/auth/signup":"/auth/login"')) {
-            throw new Error('Turnstile password sign-in protection should remain available');
+          if (!html.includes('function supabaseAuthConfigured()') ||
+              !html.includes('sb("signup","POST",{email,password,data:{display_name:name}})') ||
+              !html.includes('token?grant_type=password')) {
+            throw new Error('Browser sign-in must use Supabase Auth directly');
           }
           console.log('PWA, social preview, sitemap, and secure upload Worker assets: OK');
 
