@@ -353,17 +353,6 @@ select.filter{appearance:auto;-webkit-appearance:menulist;padding:10px 14px}
 .install-banner-copy{flex:1;min-width:0}.install-banner-copy strong{display:block;font-size:13.5px}.install-banner-copy small{display:block;font-size:11.5px;color:#a4a9c6}
 .install-banner-action{padding:9px 16px;border-radius:999px;background:var(--blue);font-size:12px;font-weight:700;white-space:nowrap}
 .install-banner-close{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.12);font-size:16px}
-.splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#c8d6fc;color:#13152c;transition:opacity .6s .05s,visibility .6s}
-body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
-.splash.done{opacity:0;visibility:hidden;pointer-events:none}
-.splash-logo{display:grid;place-items:center;width:76px;height:76px;margin-bottom:14px;border-radius:26px;background:var(--blue);color:#fff;box-shadow:0 20px 44px rgba(63,111,232,.45);animation:cover-in .7s cubic-bezier(.16,1,.3,1) both}
-.splash-logo svg{width:38px;height:38px}
-.splash-title{font-size:30px;font-weight:800;letter-spacing:-.03em}
-.splash-byline{font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:.55}
-.splash-sub{margin-top:14px;font-size:12.5px;opacity:.6}
-.splash-line{width:120px;height:3px;margin-top:14px;border-radius:3px;background:rgba(63,111,232,.22);overflow:hidden;position:relative}
-.splash-line::after{content:"";position:absolute;inset:0;width:45%;border-radius:3px;background:var(--blue);animation:slide 1.1s infinite ease-in-out}
-@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(240%)}}
 
 .view-enter{animation:view-in .5s cubic-bezier(.16,1,.3,1) both}
 @keyframes view-in{from{opacity:0;transform:translateY(14px)}}
@@ -479,14 +468,36 @@ body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
  .nav-item{z-index:1}
 }
 
+
+/* Keep the Home view and its fixed navigation inside the physical mobile viewport. */
+@media(max-width:1000px){
+ html,body{width:100%;max-width:100%;overflow-x:clip}
+ .stage,.shell,.main,#home,#study,#homeMore{width:100%;max-width:100%;min-width:0}
+ .main{overflow-x:clip}
+ #home .section-head{min-width:0;max-width:100%;flex-wrap:wrap}
+ #home .intro-strip,#home .for-you,#home .reading-streak-card,#study .feature-grid,#homeMore .home-steps,#homeMore .study-nudge{width:100%;max-width:100%;min-width:0}
+ #home .for-you,#home .wide,#study .feature,#homeMore .home-step{min-width:0}
+ #home .wide{grid-template-columns:minmax(0,88px) minmax(0,1fr);gap:14px;padding-right:58px}
+ #home .wide-info{min-width:0}
+ .bottom-nav-wrap{left:0;right:0;width:100%;max-width:100%;padding-left:max(10px,env(safe-area-inset-left));padding-right:max(10px,env(safe-area-inset-right))}
+ .bottom-nav{width:min(430px,calc(100vw - 20px));max-width:100%;min-width:0;gap:2px}
+ .nav-item{min-width:0;overflow:hidden}
+ .searchbox input{font-size:16px}
+}
+@media(max-width:420px){
+ #home .wide{grid-template-columns:72px minmax(0,1fr);gap:12px;padding:16px 54px 16px 16px}
+ #home .wide-cover{width:68px}
+ #home .wide-stats{gap:12px}
+}
+
 </style>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Squashberry Library","url":"https://squashberry.github.io/Read/","applicationCategory":"EducationalApplication","operatingSystem":"Any","description":"Organise study materials, find learning files, practise exam questions and revise with ChatGPT."}</script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8300142911609765"
      crossorigin="anonymous"></script>
 </head>
 <body class="light">
-<div id="splash" class="splash" aria-label="Preparing your library"><div class="splash-logo"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M6 8.5c4.2-2.1 8-.8 10 1.1 2-1.9 5.8-3.2 10-1.1v15c-4.2-2.1-8-.8-10 1.1-2-1.9-5.8-3.2-10-1.1v-15Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 9.7v14.9" stroke="currentColor" stroke-width="2"/></svg></div><div class="splash-title">Library</div><div class="splash-byline">by Squashberry</div><div class="splash-sub">Preparing your library</div><div class="splash-line"></div></div>
-<!-- Squashberry cinematic book intro: additive overlay above #splash. Skip with ?intro=0, force with ?intro=1. -->
+
+<!-- Squashberry cinematic book intro: the single splash shown on every page load. -->
 <script id="squashberry-intro">
 (function(){
 "use strict";
@@ -1115,7 +1126,7 @@ function syncSelection(){
 
 function toast(message,options={}){const node=$("toast");node.replaceChildren();const label=document.createElement("span");label.className="toast-message";label.textContent=String(message||"");node.appendChild(label);const actions=document.createElement("div");actions.className="toast-actions";const share=document.createElement("button");share.type="button";share.className="toast-share";share.textContent="Share with a friend";share.addEventListener("click",()=>{clearTimeout(toast.timer);node.classList.remove("show");openSharePopup(true)});actions.appendChild(share);const close=document.createElement("button");close.type="button";close.className="toast-close";close.setAttribute("aria-label","Dismiss notification");close.textContent="×";close.addEventListener("click",()=>{clearTimeout(toast.timer);node.classList.remove("show")});actions.appendChild(close);node.appendChild(actions);node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),20000)}
 function applyTheme(){document.body.classList.toggle("light",state.theme==="light");$("themeBtn").textContent=state.theme==="light"?"☾":"☼";document.querySelector('meta[name="theme-color"]').content=state.theme==="light"?"#c8d6fc":"#0c0e1f"}
-function hideSplash(){setTimeout(()=>$("splash").classList.add("done"),1250)}
+function hideSplash(){}
 function openChat(prompt){const url="https://chatgpt.com/?q="+encodeURIComponent(prompt);window.open(url,"_blank","noopener,noreferrer")}
 function basePrompt(){return "Let’s study using SquashberryLibrary. Read what "+INSTRUCTION_URL+" says and let’s get started."}
 function fileId(file){const item=manifest.items.find(x=>x.path===file.path);return item?String(item.id).padStart(3,"0"):"---";}
@@ -1701,7 +1712,7 @@ function installLibrary(){hideInstallBanner();if(deferredInstallPrompt){deferred
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;const status=$("installStatus");if(status)status.textContent="Ready to install on this device.";if(isLibraryInstalled())hideInstallBanner()});window.addEventListener("appinstalled",hideInstallBanner);$("installBannerNow").addEventListener("click",installLibrary);$("installAppBtn").addEventListener("click",installLibrary);$("installBannerClose").addEventListener("click",hideInstallBanner);
 $("headerAccountBtn").addEventListener("click",()=>{if(authState.token&&authState.user)gotoSection("you");else openAuthModal()});$("exploreBtn").addEventListener("click",()=>gotoSection("library"));$("studyAllBtn").addEventListener("click",()=>showStudyPicker("read"));$("refreshBtn").addEventListener("click",loadFiles);$("themeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));$("uploadCta").addEventListener("click",openUploadModal);$("requestDocumentBtn").addEventListener("click",openDocumentRequestModal);$("readingStreakOpen").addEventListener("click",openReadingStreakPopup);$("officeNotNow").addEventListener("click",closeOfficePopup);$("officeDownloadNow").addEventListener("click",closeOfficePopup);$("officeBackdrop").addEventListener("click",e=>{if(e.target===$("officeBackdrop"))closeOfficePopup()});$("shareNowBtn").addEventListener("click",copyShareMessage);$("deviceShareBtn").addEventListener("click",useDeviceShare);$("closeSharePopup").addEventListener("click",closeSharePopup);$("shareBackdrop").addEventListener("click",e=>{if(e.target===$("shareBackdrop"))closeSharePopup()});$("profileShareBtn").addEventListener("click",()=>openSharePopup(true));$("installAppBtn").addEventListener("click",installLibrary);$("profileThemeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("profileRefreshBtn").addEventListener("click",loadFiles);$("chatGuideBtn").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));$("guideShortcut").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));document.querySelectorAll("[data-study]").forEach(b=>b.addEventListener("click",()=>startStudy(b.dataset.study)));document.querySelectorAll(".nav-item[data-nav]").forEach(b=>b.addEventListener("click",()=>gotoSection(b.dataset.nav)));window.addEventListener("resize",()=>updateNavIndicator(document.documentElement.dataset.view||"home"),{passive:true});document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{state.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));renderFiles()}));$("search").addEventListener("input",e=>{state.query=e.target.value;renderFiles()});$("closeModal").addEventListener("click",closeModal);$("modalBackdrop").addEventListener("click",e=>{if(e.target===$("modalBackdrop"))closeModal()});document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeOfficePopup();$("welcomeBackdrop").classList.remove("show");closeSharePopup()}});$("nameForm").addEventListener("submit",e=>{e.preventDefault();const name=$("nameInput").value.trim();if(name){state.name=name;localStorage.setItem("library-name",name);toast("Lovely to have you here, "+name+".");}closeWelcome()});$("skipWelcome").addEventListener("click",closeWelcome);
 $("search").addEventListener("input",()=>{if((document.documentElement.dataset.view||"home")!=="library")gotoSection("library")});$("detailClose").addEventListener("click",closeSheet);$("detailCol").addEventListener("click",e=>{if(e.target===$("detailCol"))closeSheet()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});if(sheetMQ.addEventListener)sheetMQ.addEventListener("change",closeSheet);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>updateNavIndicator(document.documentElement.dataset.view||"home"));
-document.addEventListener("contextmenu",event=>{if(!event.target.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);document.addEventListener("dragstart",event=>{if(!event.target.closest("input,textarea,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);applyTheme();if(state.name)$("nameInput").value=state.name;renderAccountPanel();renderReadingStreak();refreshAuth();showInstallBanner();gotoSection("home");hideSplash();const pageParams=new URLSearchParams(window.location.search);if(pageParams.get("upload")==="1"){setTimeout(openUploadModal,1350)}else if(pageParams.get("share")==="1"){setTimeout(()=>openSharePopup(true),1350)}else{startPopupSequence()}renderPromptCards();loadFiles();document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadFiles(true);startDiscoveryRotation()}else stopDiscoveryRotation()});window.setInterval(()=>{if(!document.hidden)loadFiles(true)},60000);if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",event=>{if(event.data&&event.data.type==="LIBRARY_OPEN_SHARE")openSharePopup(true);else if(event.data&&event.data.type==="LIBRARY_OPEN_HOME")gotoSection("home")});window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Offline app shell unavailable",err)))}
+document.addEventListener("contextmenu",event=>{if(!event.target.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);document.addEventListener("dragstart",event=>{if(!event.target.closest("input,textarea,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);applyTheme();if(state.name)$("nameInput").value=state.name;renderAccountPanel();renderReadingStreak();refreshAuth();showInstallBanner();gotoSection("home");const pageParams=new URLSearchParams(window.location.search);if(pageParams.get("upload")==="1"){setTimeout(openUploadModal,1350)}else if(pageParams.get("share")==="1"){setTimeout(()=>openSharePopup(true),1350)}else{startPopupSequence()}renderPromptCards();loadFiles();document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadFiles(true);startDiscoveryRotation()}else stopDiscoveryRotation()});window.setInterval(()=>{if(!document.hidden)loadFiles(true)},60000);if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",event=>{if(event.data&&event.data.type==="LIBRARY_OPEN_SHARE")openSharePopup(true);else if(event.data&&event.data.type==="LIBRARY_OPEN_HOME")gotoSection("home")});window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Offline app shell unavailable",err)))}
 })();
 </script>
 </body>
