@@ -59,10 +59,10 @@ jobs:
           if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
-if (!worker.includes('MAX_FILES_PER_REQUEST = 24')) throw new Error('Upload Worker must accept batches of up to 24 files');
-if (!html.includes('up to 24') || !html.includes('uploadQueue.length>24')) throw new Error('Uploader UI must enforce the 24-file batch limit');
-if (!html.includes('openUploadTitleConfirmation(cfg)') || !html.includes('Yes, continue') || !html.includes('cancelUploadTitleConfirm')) throw new Error('Missing editable title confirmation popup');
-const splash = fs.readFileSync('splash.js', 'utf8');
+          if (!worker.includes('MAX_FILES_PER_REQUEST = 24')) throw new Error('Upload Worker must accept batches of up to 24 files');
+          if (!html.includes('up to 24') || !html.includes('uploadQueue.length>24')) throw new Error('Uploader UI must enforce the 24-file batch limit');
+          if (!html.includes('openUploadTitleConfirmation(cfg)') || !html.includes('Yes, continue') || !html.includes('cancelUploadTitleConfirm')) throw new Error('Missing editable title confirmation popup');
+          const splash = fs.readFileSync('splash.js', 'utf8');
           new Function(splash);
           if (splash.includes('end(true)') || splash.includes('onKey')) throw new Error('The splash script still contains a user or automatic skip path');
           console.log('Splash download, full-playback and no-skip checks: OK');
