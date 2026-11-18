@@ -3,9 +3,9 @@ const REPO = "Read";
 const BRANCH = "master";
 const ALLOWED_ORIGIN = "https://squashberry.github.io";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const MAX_FILES_PER_REQUEST = 4;
-const DAILY_IP_FILE_LIMIT = 10;
-const DAILY_USER_FILE_LIMIT = 20;
+const MAX_FILES_PER_REQUEST = 24;
+const DAILY_IP_FILE_LIMIT = 100;
+const DAILY_USER_FILE_LIMIT = 100;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
 
 function response(data, status = 200) {
