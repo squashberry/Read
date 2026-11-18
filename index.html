@@ -1470,7 +1470,7 @@ function collectionStudyPrompt(collection){
 }
 function buildUploadedFilesPrompt(uploaded){
  const ids=uploaded.map(item=>String(item.id).padStart(3,"0"));
- return basePrompt()+"\\n\\nStudy files "+ids.join(", ")+" together. These are the files just uploaded. Read every listed original document from the Library catalogue and explain how the materials relate. If one cannot be opened, tell me which ID and continue with the others.";
+ return basePrompt()+"\n\nStudy files "+ids.join(", ")+" together. These are the files just uploaded. Read every listed original document from the Library catalogue and explain how the materials relate. If one cannot be opened, tell me which ID and continue with the others.";
 }
 async function handleEasyUpload(cfg){
  const ack=$("publicAck"),studyAck=$("studyAck"),button=$("uploadSubmit"),results=$("uploadResults");
