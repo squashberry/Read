@@ -615,7 +615,7 @@ async function handleUpload(request, env) {
           "- Library file ID: " + id + "\n" +
           "- Original uploaded filename: " + item.sourceName + "\n" +
           "- Stored original file: " + path + "\n" +
-          "- Uploaded by Library account: " + (cleanText(user.display_name,50) || "Library member") + "\n" +
+          "- Contributor: " + (Number(user.allow_followers||0)===1 ? (cleanText(user.display_name,50) || "Library contributor") : "Not shared publicly") + "\n" +
           (item.manualReview ? "- Intake review: manually confirmed by the uploader.\n\n" : "- Intake review: AI-assisted title and study-material check.\n\n") +
           "## Extracted text\n\n" + item.text.trim() + "\n";
         stage = "writing the readable text transcript to GitHub";
