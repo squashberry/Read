@@ -15,7 +15,7 @@ function response(data, status = 200) {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
       "access-control-allow-origin": ALLOWED_ORIGIN,
-      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "access-control-allow-headers": "authorization, content-type",
       "vary": "Origin",
       "x-content-type-options": "nosniff"
@@ -342,7 +342,7 @@ async function getSessionUser(request, env) {
  const email=cleanText(authUser&&authUser.email,254).toLowerCase();
  if(!id||!email||email.indexOf("@")<1)return null;
  await ensureUploadCategoriesTable(env);
- let user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+ let user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,allow_followers FROM users WHERE id = ?").bind(id).first();
  if(!user){
   const collision=await env.DB.prepare("SELECT id FROM users WHERE email = ?").bind(email).first();
   const storedEmail=collision?"library-"+id+"@accounts.invalid":email;
@@ -350,13 +350,13 @@ async function getSessionUser(request, env) {
   const displayName=cleanText(metadata.display_name||metadata.full_name||metadata.name,50)||email.split("@")[0].slice(0,50)||"Student";
   const now=Math.floor(Date.now()/1000);
   await env.DB.prepare("INSERT OR IGNORE INTO users (id,email,display_name,created_at,updated_at) VALUES (?,?,?,?,?)").bind(id,storedEmail,displayName,now,now).run();
-  user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at FROM users WHERE id = ?").bind(id).first();
+  user=await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,allow_followers FROM users WHERE id = ?").bind(id).first();
   if(user&&!collision)await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),id,"welcome","Joined Squashberry Library",now).run();
  }
  return user?{...user,expires_at:null}:null;
 }
 function publicUser(user) {
- return {id:user.id,displayName:user.display_name,createdAt:user.created_at,updatedAt:user.updated_at};
+ return {id:user.id,displayName:user.display_name,allowFollow:Number(user.allow_followers||0)===1,createdAt:user.created_at,updatedAt:user.updated_at};
 }
 async function handleMe(request, env) {
   const user = await getSessionUser(request,env);
@@ -364,11 +364,20 @@ async function handleMe(request, env) {
   if (request.method === "GET") return response({ok:true,user:publicUser(user)});
   if (request.method === "PATCH") {
     const body = await requestJson(request);
-    const name = cleanText(body.displayName,50);
-    if (name.length < 2) return response({error:"Your display name must be at least two characters."},400);
+    let name = user.display_name;
+    if (Object.prototype.hasOwnProperty.call(body,"displayName")) {
+      name = cleanText(body.displayName,50);
+      if (name.length < 2) return response({error:"Your display name must be at least two characters."},400);
+    }
+    let allowFollowers = Number(user.allow_followers||0)===1;
+    if (Object.prototype.hasOwnProperty.call(body,"allowFollow")) {
+      if (typeof body.allowFollow !== "boolean") return response({error:"Choose whether readers may follow you."},400);
+      allowFollowers = body.allowFollow;
+    }
     const now = Math.floor(Date.now()/1000);
-    await env.DB.prepare("UPDATE users SET display_name = ?, updated_at = ? WHERE id = ?").bind(name,now,user.id).run();
-    const changed = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,? AS expires_at FROM users WHERE id = ?").bind(user.expires_at,user.id).first();
+    await env.DB.prepare("UPDATE users SET display_name=?,allow_followers=?,updated_at=? WHERE id=?").bind(name,allowFollowers?1:0,now,user.id).run();
+    if (!allowFollowers) await env.DB.prepare("DELETE FROM follows WHERE contributor_id=?").bind(user.id).run();
+    const changed = await env.DB.prepare("SELECT id,email,display_name,created_at,updated_at,allow_followers FROM users WHERE id = ?").bind(user.id).first();
     return response({ok:true,user:publicUser(changed)});
   }
   return response({error:"Method not allowed."},405);
@@ -378,13 +387,24 @@ async function handleDashboard(request, env) {
   if (!user) return response({error:"Please sign in to your personal Library again."},401);
   const summary = await env.DB.prepare("SELECT COUNT(*) AS file_count, COALESCE(SUM(file_size),0) AS total_bytes FROM uploads WHERE user_id = ?").bind(user.id).first();
   const uploads = await env.DB.prepare("SELECT u.file_id,u.file_name,u.file_path,u.file_size,u.created_at,COALESCE(c.category, 'Uncategorised') AS category FROM uploads u LEFT JOIN upload_categories c ON c.file_id = u.file_id AND c.user_id = u.user_id WHERE u.user_id = ? ORDER BY u.created_at DESC").bind(user.id).all();
-  const activity = await env.DB.prepare("SELECT kind,detail,created_at FROM activity WHERE user_id = ? ORDER BY created_at DESC LIMIT 8").bind(user.id).all();
-  return response({
-    ok:true,
-    stats:{fileCount:Number(summary.file_count||0),totalBytes:Number(summary.total_bytes||0)},
-    uploads:(uploads.results||[]).map(row=>({id:String(row.file_id).padStart(3,"0"),name:row.file_name,path:row.file_path,size:Number(row.file_size||0),category:row.category||"Uncategorised",createdAt:row.created_at})),
-    activity:(activity.results||[]).map(row=>({kind:row.kind,detail:row.detail,createdAt:row.created_at}))
-  });
+  const activity = await env.DB.prepare("SELECT kind,detail,created_at FROM activity WHERE user_id = ? ORDER BY created_at DESC LIMIT 12").bind(user.id).all();
+  const readDaysResult = await env.DB.prepare("SELECT date(created_at,'unixepoch') AS day FROM activity WHERE user_id=? AND kind='opened-file' AND created_at>=? GROUP BY date(created_at,'unixepoch') ORDER BY day DESC").bind(user.id,Math.floor(Date.now()/1000)-60*86400).all();
+  const readDays = new Set((readDaysResult.results||[]).map(row=>row.day));
+  const today = new Date().toISOString().slice(0,10);
+  const shiftDay = (value,delta) => {const d=new Date(value+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+delta);return d.toISOString().slice(0,10)};
+  const todayHasRead = readDays.has(today);
+  let cursor = todayHasRead ? today : shiftDay(today,-1), currentStreak = 0;
+  while (readDays.has(cursor) && currentStreak < 60) { currentStreak++; cursor=shiftDay(cursor,-1); }
+  const week = Array.from({length:7},(_,index)=>{const date=shiftDay(today,index-6);return {date,read:readDays.has(date)};});
+  const collectionRows = await env.DB.prepare("SELECT id,name,description,is_public,created_at,updated_at FROM collections WHERE user_id=? ORDER BY updated_at DESC").bind(user.id).all();
+  const collections=[];
+  for (const row of collectionRows.results||[]) {
+    const items=await env.DB.prepare("SELECT file_path,file_id,file_name FROM collection_items WHERE collection_id=? ORDER BY added_at DESC").bind(row.id).all();
+    collections.push({id:row.id,name:row.name,description:row.description||"",isPublic:Number(row.is_public)===1,createdAt:row.created_at,updatedAt:row.updated_at,files:(items.results||[]).map(item=>({path:item.file_path,id:String(item.file_id||""),name:item.file_name}))});
+  }
+  const followingRows=await env.DB.prepare("SELECT u.id,u.display_name FROM follows f JOIN users u ON u.id=f.contributor_id WHERE f.follower_id=? AND u.allow_followers=1 ORDER BY u.display_name COLLATE NOCASE").bind(user.id).all();
+  const requestRows=await env.DB.prepare("SELECT id,title,subject,details,status,created_at FROM document_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 12").bind(user.id).all();
+  return response({ok:true,user:publicUser(user),stats:{fileCount:Number(summary.file_count||0),totalBytes:Number(summary.total_bytes||0)},uploads:(uploads.results||[]).map(row=>({id:String(row.file_id).padStart(3,"0"),name:row.file_name,path:row.file_path,size:Number(row.file_size||0),category:row.category||"Uncategorised",createdAt:row.created_at})),activity:(activity.results||[]).map(row=>({kind:row.kind,detail:row.detail,createdAt:row.created_at})),readingStreak:{current:currentStreak,todayHasRead,week},collections,following:(followingRows.results||[]).map(row=>({id:row.id,displayName:row.display_name})),requests:(requestRows.results||[]).map(row=>({id:row.id,title:row.title,subject:row.subject,details:row.details,status:row.status,createdAt:row.created_at}))});
 }
 async function handleActivity(request, env) {
   const user = await getSessionUser(request,env);
@@ -398,6 +418,119 @@ async function handleActivity(request, env) {
   await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,kind,detail||kind,now).run();
   return response({ok:true});
 }
+
+function validPublicPath(value) {
+ const path=cleanText(value,180);
+ return path && !path.startsWith("/") && !path.includes("\\") && !path.split("/").some(part=>part===".."||part===".") ? path : "";
+}
+function normalCollectionItems(items) {
+ if (!Array.isArray(items) || items.length<1 || items.length>80) return null;
+ const seen=new Set(),out=[];
+ for (const item of items) {
+  const path=validPublicPath(item&&item.path); if (!path) return null;
+  if (seen.has(path)) continue; seen.add(path);
+  const id=cleanText(item&&item.id,12).replace(/[^0-9]/g,"");
+  const name=cleanText(item&&item.name,120)||path.split("/").pop();
+  out.push({path,id,name});
+ }
+ return out.length?out:null;
+}
+async function storeCollectionItems(env,collectionId,items,now) {
+ await env.DB.prepare("DELETE FROM collection_items WHERE collection_id=?").bind(collectionId).run();
+ for (const item of items) await env.DB.prepare("INSERT INTO collection_items (collection_id,file_path,file_id,file_name,added_at) VALUES (?,?,?,?,?)").bind(collectionId,item.path,item.id,item.name,now).run();
+}
+async function handleContributors(request,env) {
+ const rows=await env.DB.prepare("SELECT u.id,u.display_name,up.file_id,up.file_path,up.file_name FROM users u JOIN uploads up ON up.user_id=u.id WHERE u.allow_followers=1 ORDER BY u.display_name COLLATE NOCASE,up.created_at DESC").all();
+ const grouped=new Map();
+ for (const row of rows.results||[]) {
+  if (!grouped.has(row.id)) grouped.set(row.id,{id:row.id,displayName:row.display_name,files:[]});
+  grouped.get(row.id).files.push({path:row.file_path,id:String(row.file_id).padStart(3,"0"),name:row.file_name});
+ }
+ return response({ok:true,contributors:Array.from(grouped.values())});
+}
+async function handleFileView(request,env) {
+ const body=await requestJson(request),path=validPublicPath(body.path),visitor=cleanText(body.visitorKey,80);
+ if (!path || !/^[a-z0-9-]{16,80}$/i.test(visitor)) return response({error:"The file view could not be recorded."},400);
+ const today=new Date().toISOString().slice(0,10),ipKey="file-view-ip:"+await sha256Hex(ipOf(request))+":"+today;
+ if (!await rateLimit(env,ipKey,240,86400)) return response({error:"Too many requests."},429);
+ await env.DB.prepare("INSERT OR IGNORE INTO file_views (id,file_path,file_id,file_name,visitor_key,view_date,viewed_at) VALUES (?,?,?,?,?,?,?)").bind(crypto.randomUUID(),path,cleanText(body.id,12),cleanText(body.name,120)||path.split("/").pop(),visitor,today,Math.floor(Date.now()/1000)).run();
+ return response({ok:true});
+}
+async function handleTrending(request,env) {
+ const rows=await env.DB.prepare("SELECT file_path,file_id,file_name,COUNT(*) AS views FROM file_views WHERE view_date>=date('now','-6 days') GROUP BY file_path ORDER BY views DESC,file_name COLLATE NOCASE LIMIT 8").all();
+ return response({ok:true,items:(rows.results||[]).map(row=>({path:row.file_path,id:String(row.file_id||""),name:row.file_name,views:Number(row.views||0)}))});
+}
+async function handlePublicCollections(request,env) {
+ const rows=await env.DB.prepare("SELECT c.id,c.name,c.description,c.created_at,c.updated_at,u.display_name,u.allow_followers FROM collections c JOIN users u ON u.id=c.user_id WHERE c.is_public=1 ORDER BY c.updated_at DESC LIMIT 12").all();
+ const collections=[];
+ for (const row of rows.results||[]) {
+  const items=await env.DB.prepare("SELECT file_path,file_id,file_name FROM collection_items WHERE collection_id=? ORDER BY added_at DESC").bind(row.id).all();
+  const files=(items.results||[]).map(item=>({path:item.file_path,id:String(item.file_id||""),name:item.file_name}));
+  if(files.length)collections.push({id:row.id,name:row.name,description:row.description||"",contributor:Number(row.allow_followers)===1?row.display_name:"",createdAt:row.created_at,files});
+ }
+ return response({ok:true,collections});
+}
+async function handleFollow(request,env,contributorId="") {
+ const user=await getSessionUser(request,env);
+ if (!user) return response({error:"Sign in before following a contributor."},401);
+ let target=cleanText(contributorId,64);
+ if (request.method==="POST") {const body=await requestJson(request);target=cleanText(body.contributorId,64);}
+ if (!target || target===user.id) return response({error:"Choose a different contributor."},400);
+ if (request.method==="POST") {
+  const allowed=await env.DB.prepare("SELECT id FROM users WHERE id=? AND allow_followers=1").bind(target).first();
+  if (!allowed) return response({error:"This contributor is not accepting followers."},404);
+  await env.DB.prepare("INSERT OR IGNORE INTO follows (follower_id,contributor_id,created_at) VALUES (?,?,?)").bind(user.id,target,Math.floor(Date.now()/1000)).run();
+  return response({ok:true,following:true});
+ }
+ if (request.method==="DELETE") {
+  await env.DB.prepare("DELETE FROM follows WHERE follower_id=? AND contributor_id=?").bind(user.id,target).run();
+  return response({ok:true,following:false});
+ }
+ return response({error:"Method not allowed."},405);
+}
+async function handleCollections(request,env,collectionId="") {
+ const user=await getSessionUser(request,env);
+ if (!user) return response({error:"Sign in to manage your collections."},401);
+ if (request.method==="POST" && !collectionId) {
+  const body=await requestJson(request),name=cleanText(body.name,60),description=cleanText(body.description,240),items=normalCollectionItems(body.items);
+  if (name.length<2) return response({error:"Give your collection a name of at least two characters."},400);
+  if (!items) return response({error:"Choose at least one valid document for your collection."},400);
+  const id=crypto.randomUUID(),now=Math.floor(Date.now()/1000),isPublic=body.isPublic===true;
+  await env.DB.prepare("INSERT INTO collections (id,user_id,name,description,is_public,created_at,updated_at) VALUES (?,?,?,?,?,?,?)").bind(id,user.id,name,description,isPublic?1:0,now,now).run();
+  await storeCollectionItems(env,id,items,now);
+  return response({ok:true,id},201);
+ }
+ if (!collectionId) return response({error:"Method not allowed."},405);
+ const existing=await env.DB.prepare("SELECT id FROM collections WHERE id=? AND user_id=?").bind(collectionId,user.id).first();
+ if (!existing) return response({error:"Collection not found."},404);
+ if (request.method==="DELETE") {
+  await env.DB.prepare("DELETE FROM collections WHERE id=? AND user_id=?").bind(collectionId,user.id).run();
+  return response({ok:true,deleted:true});
+ }
+ if (request.method==="PATCH") {
+  const body=await requestJson(request),name=cleanText(body.name,60),description=cleanText(body.description,240),items=normalCollectionItems(body.items);
+  if (name.length<2) return response({error:"Give your collection a name of at least two characters."},400);
+  if (!items) return response({error:"Choose at least one valid document for your collection."},400);
+  const now=Math.floor(Date.now()/1000);
+  await env.DB.prepare("UPDATE collections SET name=?,description=?,is_public=?,updated_at=? WHERE id=? AND user_id=?").bind(name,description,body.isPublic===true?1:0,now,collectionId,user.id).run();
+  await storeCollectionItems(env,collectionId,items,now);
+  return response({ok:true,id:collectionId});
+ }
+ return response({error:"Method not allowed."},405);
+}
+async function handleDocumentRequest(request,env) {
+ const user=await getSessionUser(request,env);
+ if (!user) return response({error:"Sign in to request a document."},401);
+ const body=await requestJson(request),title=cleanText(body.title,100),subject=cleanText(body.subject,70),details=cleanText(body.details,500);
+ if (title.length<3) return response({error:"Describe the document you are looking for."},400);
+ const today=new Date().toISOString().slice(0,10),key="document-request:"+user.id+":"+today;
+ if (!await rateLimit(env,key,5,86400)) return response({error:"You have reached the daily document request limit. Try again tomorrow."},429);
+ const id=crypto.randomUUID(),now=Math.floor(Date.now()/1000);
+ await env.DB.prepare("INSERT INTO document_requests (id,user_id,title,subject,details,status,created_at) VALUES (?,?,?,?,?,'open',?)").bind(id,user.id,title,subject,details,now).run();
+ await env.DB.prepare("INSERT INTO activity (id,user_id,kind,detail,created_at) VALUES (?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"document-request","Requested document: "+title,now).run();
+ return response({ok:true,request:{id,title,subject,details,status:"open",createdAt:now}},201);
+}
+
 async function handleUpload(request, env) {
   const user = await getSessionUser(request,env);
   if (!user) return response({error:"Sign in to your personal Library before uploading files."},401);
@@ -497,7 +630,7 @@ async function handleUpload(request, env) {
           })
         });
       }
-      const uploadedBy = cleanText(user.display_name,50) || "Library member";
+      const uploadedBy = Number(user.allow_followers||0)===1 ? (cleanText(user.display_name,50) || "Library member") : "";
       const entry = {id,name:filename,path,size:item.file.size,kind:"study-material",uploadedAt:new Date().toISOString(),uploadedBy,category};
       if (transcriptPath) entry.transcriptPath = transcriptPath;
       stage = "registering the file in the Library catalogue";
@@ -695,7 +828,7 @@ export default {
     if (origin !== ALLOWED_ORIGIN) return response({error:"This website is not allowed to use the personal Library service."},403);
     if (request.method === "OPTIONS") return new Response(null,{status:204,headers:{
       "access-control-allow-origin":ALLOWED_ORIGIN,
-      "access-control-allow-methods":"GET, POST, PATCH, OPTIONS",
+      "access-control-allow-methods":"GET, POST, PATCH, DELETE, OPTIONS",
       "access-control-allow-headers":"authorization, content-type",
       "access-control-max-age":"86400",
       "vary":"Origin"
@@ -713,6 +846,16 @@ export default {
       if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
+      if (path === "/auth/follows" && request.method === "POST") return await handleFollow(request,env);
+      if (path.startsWith("/auth/follows/") && request.method === "DELETE") return await handleFollow(request,env,decodeURIComponent(path.slice("/auth/follows/".length)));
+      if (path === "/auth/collections" && request.method === "POST") return await handleCollections(request,env);
+      const collectionMatch=path.match(/^\/auth\/collections\/([a-f0-9-]{36})$/i);
+      if (collectionMatch && (request.method === "PATCH" || request.method === "DELETE")) return await handleCollections(request,env,collectionMatch[1]);
+      if (path === "/document-requests" && request.method === "POST") return await handleDocumentRequest(request,env);
+      if (path === "/contributors" && request.method === "GET") return await handleContributors(request,env);
+      if (path === "/trending" && request.method === "GET") return await handleTrending(request,env);
+      if (path === "/files/view" && request.method === "POST") return await handleFileView(request,env);
+      if (path === "/collections/public" && request.method === "GET") return await handlePublicCollections(request,env);
       if (path === "/push/status" && request.method === "GET") return await handlePushStatus(request,env);
       if (path === "/push/subscribe" && request.method === "POST") return await handlePushSubscribe(request,env);
       if (path === "/push/unsubscribe" && request.method === "POST") return await handlePushUnsubscribe(request,env);
