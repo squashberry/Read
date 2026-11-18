@@ -1,12 +1,12 @@
 const OWNER = "squashberry";
 const REPO = "Read";
 const BRANCH = "master";
-const ALLOWED_ORIGIN = "https://squashberry.github.io";
+const ALLOWED_ORIGIN = "https://read-674.pages.dev";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 80 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 24;
-const DAILY_IP_FILE_LIMIT = 24;
-const DAILY_USER_FILE_LIMIT = 24;
+const DAILY_IP_FILE_LIMIT = 100;
+const DAILY_USER_FILE_LIMIT = 100;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
 
 function response(data, status = 200) {
@@ -266,7 +266,7 @@ async function githubRequest(path, token, init = {}) {
     headers: {
       "accept":"application/vnd.github+json",
       "authorization":"Bearer " + token,
-      "user-agent":"SquashberryLibrary/1.0 (+https://squashberry.github.io/Read/)",
+      "user-agent":"SquashberryLibrary/1.0 (+https://read-674.pages.dev/)",
       "x-github-api-version":"2022-11-28",
       ...(init.headers || {})
     }
@@ -816,8 +816,8 @@ async function sendDailyReminders(env,scheduledDate=new Date()) {
         title:"A little study reminder",
         body:"Take 10 minutes for one topic today. A small study session still counts.",
         tag:"squashberry-daily-study",
-        url:"https://squashberry.github.io/Read/?reminder=1",
-        shareUrl:"https://squashberry.github.io/Read/?share=1"
+        url:"https://read-674.pages.dev/?reminder=1",
+        shareUrl:"https://read-674.pages.dev/?share=1"
       },env);
       if (result.status >= 200 && result.status < 300) {
         await env.DB.prepare("UPDATE push_subscriptions SET last_sent_date=?,updated_at=? WHERE endpoint=?").bind(local.date,Math.floor(Date.now()/1000),row.endpoint).run();
