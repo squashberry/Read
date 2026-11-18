@@ -62,7 +62,7 @@ var STYLE=
 ".wm::before{top:calc(.06em + var(--mt,0px));bottom:calc(-.08em - var(--mb,0px));transform:translateY(calc(var(--u)*.16em)) rotate(calc(-.6deg*(1 - var(--u)))) scaleY(calc(1 - var(--u)*.945));clip-path:inset(0 calc((1 - var(--hl))*100%) 0 0)}"+
 ".wm::after{content:attr(data-t);position:absolute;left:0;top:0;white-space:nowrap;color:transparent;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.95) 50%,transparent 62%) no-repeat;background-size:260% 100%;background-position:var(--sw,130%) 0;-webkit-background-clip:text;background-clip:text}"+
 ".sqd .wm::after{background-image:linear-gradient(105deg,transparent 38%,rgba(255,196,176,.95) 50%,transparent 62%)}"+
-".lb{left:50%;top:50%;opacity:0;white-space:nowrap;font-family:"+SANS+";font-weight:600;transform:translate(-50%,-50%)}"+
+".lb{left:50%;top:50%;opacity:0;white-space:nowrap;font-family:"+SANS+";font-weight:600;transform:translate(-50%,-50%)}";
 /* ---------- book copy ---------- */
 var LH='<span class="rh"><i>148</i><i>Methods of Study</i></span><h3>4.2&ensp;Reading Actively</h3>'+
 '<p class="n">Reading is not a passive act. A page is understood only when the reader returns to it with a question, and the strongest students learn to ask before they read, while they read, and again once the chapter has closed.</p>'+
