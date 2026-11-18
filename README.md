@@ -7,8 +7,8 @@ Squashberry Library is a mobile-first study web app for keeping learning materia
 
 ## What students can do
 
-- Use a light-first, warm brown-and-white interface with smooth, phone-friendly animations.
-- Move between Home, Library, Prompts and You with a BerreX-inspired sliding active-tab indicator.
+- Use a light-first, book-app interface — periwinkle stage, white shelves with generated file covers, blue accents and a dark “About this file” panel (a bottom sheet on phones) — with smooth, phone-friendly animations and a dark theme.
+- Move between Home, Library, Prompts and You with a sliding active-tab indicator (tabs on desktop, a floating bar on phones). Search sits in the top bar and jumps straight to the Library.
 - Search numbered learning files and use ready-made study prompts.
 - Install the app to a home screen; the install reminder slides down at the top and disappears after five seconds unless the app is already installed.
 - Open the short ChatGPT guide instead of copying a long technical paragraph.

@@ -6,12 +6,23 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "portrait-primary",
-  "background_color": "#fbf8f4",
-  "theme_color": "#80583f",
-  "categories": ["education", "productivity"],
+  "background_color": "#c8d6fc",
+  "theme_color": "#3f6fe8",
+  "categories": [
+    "education",
+    "productivity"
+  ],
   "icons": [
-    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }
