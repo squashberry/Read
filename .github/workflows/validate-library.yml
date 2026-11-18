@@ -25,12 +25,15 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('index.html', 'utf8');
-          const start = html.indexOf('<script>');
-          const end = html.indexOf('</script>', start);
-          if (start < 0 || end < 0) throw new Error('Inline app JavaScript not found');
-          new Function(html.slice(start + '<script>'.length, end));
+          const inlineScripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+          let parsedInlineScripts = 0;
+          for (const match of inlineScripts) {
+            if (/\\btype=["']application\\/ld\\+json["']/i.test(match[1])) continue;
+            if (match[2].trim()) { new Function(match[2]); parsedInlineScripts++; }
+          }
+          if (parsedInlineScripts < 2) throw new Error('Expected both the splash loader and main app JavaScript');
           new Function(fs.readFileSync('upload-config.js', 'utf8'));
-          console.log('App and upload-config JavaScript syntax: OK');
+          console.log('Inline app, splash loader, and upload-config JavaScript syntax: OK');
           const { execFileSync } = require('node:child_process');
           execFileSync('node', ['--input-type=module', '--check'], { input: fs.readFileSync('upload-worker/worker.js', 'utf8') });
           console.log('Cloudflare Worker module syntax: OK');
@@ -52,7 +55,7 @@ jobs:
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v13')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v14')) throw new Error('Service worker cache version was not refreshed');
 if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
 if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
 const splash = fs.readFileSync('splash.js', 'utf8');
