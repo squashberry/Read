@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://read-674.pages.dev/sitemap.xml
+Sitemap: https://letsread.pages.dev/sitemap.xml

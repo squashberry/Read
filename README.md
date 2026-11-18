@@ -2,8 +2,8 @@
 
 Squashberry Library is a mobile-first study web app for keeping learning materials together, opening numbered files, and studying with ChatGPT.
 
-**Main app:** https://squashberry.github.io/Read/  
-**Simple ChatGPT guide:** https://squashberry.github.io/Read/gptinstruction/
+**Main app:** https://letsread.pages.dev/  
+**Simple ChatGPT guide:** https://letsread.pages.dev/gptinstruction/
 
 ## What students can do
 
@@ -17,7 +17,7 @@ Squashberry Library is a mobile-first study web app for keeping learning materia
 
 ## Hosting and deployment status
 
-The front end is designed for GitHub Pages at **https://squashberry.github.io/Read/**. In repository Settings → Pages, use branch `master` and folder `/(root)` if Pages has not already been enabled.
+The front end is deployed on Cloudflare Pages at **https://letsread.pages.dev/**. The Cloudflare Pages project is connected to this repository’s `master` branch.
 
 Email/password accounts and sessions use a dedicated Supabase Auth project. The Cloudflare Worker is only the file API and verifies Supabase access tokens. Cloudflare Turnstile is no longer used for authentication. Public Supabase settings are in `upload-config.js`; private Worker secrets remain server-side.
 

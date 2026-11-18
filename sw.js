@@ -1,4 +1,4 @@
-const CACHE_NAME = "squashberry-library-shell-v16";
+const CACHE_NAME = "squashberry-library-shell-v17";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./og-image.svg", "./upload-config.js", "./splash.js", "./gptinstruction/"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -46,7 +46,7 @@ self.addEventListener("push", (event) => {
     tag: payload.tag || "squashberry-daily-study",
     renotify: true,
     requireInteraction: false,
-    data: {url: payload.url || "https://read-674.pages.dev/", shareUrl: payload.shareUrl || "https://read-674.pages.dev/?share=1"},
+    data: {url: payload.url || "https://letsread.pages.dev/", shareUrl: payload.shareUrl || "https://letsread.pages.dev/?share=1"},
     actions: [
       {action: "open", title: "Open Library"},
       {action: "share", title: "Share with a friend"}
@@ -64,7 +64,7 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil((async () => {
     const data = event.notification.data || {};
     const isShare = event.action === "share";
-    const targetUrl = isShare ? (data.shareUrl || "https://read-674.pages.dev/?share=1") : (data.url || "https://read-674.pages.dev/");
+    const targetUrl = isShare ? (data.shareUrl || "https://letsread.pages.dev/?share=1") : (data.url || "https://letsread.pages.dev/");
     const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
     for (const client of windows) {
       if (new URL(client.url).origin === self.location.origin) {

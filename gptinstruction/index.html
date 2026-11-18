@@ -6,12 +6,12 @@
 <meta name="theme-color" content="#c8d6fc">
 <meta name="description" content="A simple guide to uploading study materials, organising collections and studying every file in a collection with ChatGPT.">
 <meta name="robots" content="index,follow">
-<link rel="canonical" href="https://read-674.pages.dev/gptinstruction/">
+<link rel="canonical" href="https://letsread.pages.dev/gptinstruction/">
 <meta property="og:type" content="article">
 <meta property="og:title" content="How to study with Squashberry Library">
 <meta property="og:description" content="A simple starting point for choosing learning materials and studying with ChatGPT.">
-<meta property="og:url" content="https://read-674.pages.dev/gptinstruction/">
-<meta property="og:image" content="https://read-674.pages.dev/og-image.svg">
+<meta property="og:url" content="https://letsread.pages.dev/gptinstruction/">
+<meta property="og:image" content="https://letsread.pages.dev/og-image.svg">
 <meta name="twitter:card" content="summary_large_image">
 <title>How to study with Squashberry Library</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -91,7 +91,7 @@ details[open] summary::after{content:"–"}
 <h1>Let’s study using<br><span>SquashberryLibrary.</span></h1>
 <p class="intro">Think of this as your study partner. Upload your notes, group related files into collections such as Med-Surg, then ask ChatGPT to read the whole collection and help you study it together.</p>
 <div class="actions"><a class="btn primary" href="../?upload=1">Upload a study file ↗</a><a class="btn" href="../">Browse learning files</a></div>
-<div class="prompt"><p>Start a ChatGPT conversation with this simple message:</p><code id="starter">Let’s study using SquashberryLibrary. Follow the instructions at https://read-674.pages.dev/gptinstruction/index.html. When I give you a collection name and its file IDs, read every listed document together. Do not stop after the first file.</code><button id="copyStarter" type="button">Copy starter message</button></div>
+<div class="prompt"><p>Start a ChatGPT conversation with this simple message:</p><code id="starter">Let’s study using SquashberryLibrary. Follow the instructions at https://letsread.pages.dev/gptinstruction/index.html. When I give you a collection name and its file IDs, read every listed document together. Do not stop after the first file.</code><button id="copyStarter" type="button">Copy starter message</button></div>
 </section>
 <section class="cards" aria-label="Ways to begin">
 <article class="card"><span class="num">1</span><h2>Show me the files</h2><p>ChatGPT should show the available learning materials by number and name so you can choose one.</p></article>
@@ -115,7 +115,7 @@ details[open] summary::after{content:"–"}
 <div class="step"><span class="num">B</span><div><b>“Which file would you like to use?”</b><p>If several notes match the topic, ChatGPT should show their names and numbers before choosing.</p></div></div>
 <div class="step"><span class="num">C</span><div><b>“Would you like a simple explanation, a full lesson, revision notes, flashcards or exam practice?”</b><p>You can ask for a different way at any point. Exam practice should ask one question at a time.</p></div></div>
 </div>
-<p class="tip"><b>If a file can’t be found or opened:</b> ChatGPT should be honest, suggest a genuinely similar file if one exists, or ask a short clarifying question if the request is unclear. If the exact file is missing or its contents still cannot be accessed, it should guide you to <a href="https://read-674.pages.dev/?upload=1">upload or re-upload it to Squashberry Library</a>. To browse existing materials, visit the <a href="https://read-674.pages.dev/">Library website</a>. It must never pretend it has read a file it could not open.</p>
+<p class="tip"><b>If a file can’t be found or opened:</b> ChatGPT should be honest, suggest a genuinely similar file if one exists, or ask a short clarifying question if the request is unclear. If the exact file is missing or its contents still cannot be accessed, it should guide you to <a href="https://letsread.pages.dev/?upload=1">upload or re-upload it to Squashberry Library</a>. To browse existing materials, visit the <a href="https://letsread.pages.dev/">Library website</a>. It must never pretend it has read a file it could not open.</p>
 </section>
 <section class="guide">
 <h2>Upload and organise your notes</h2>
@@ -139,7 +139,7 @@ details[open] summary::after{content:"–"}
 <li>For <b>collection study mode</b>, recognise a request containing <code>COLLECTION MODE — READ THE WHOLE COLLECTION</code>, a collection name, and a list of exact Library file IDs. This means the learner wants the <b>entire saved collection</b>, not a single document. Do not ask which file to choose. Use the live catalogue to match every listed ID, retrieve and read each original source one by one, and keep the collection’s file order. After covering each source, connect shared themes, compare differences, explain how the documents support or extend one another, and identify gaps. Do not add unrelated catalogue files. If an ID is missing or a source cannot be opened, name that exact ID, be clear about the limitation, and continue with the other accessible files; never claim the whole collection was read if some files were not accessible.</li>
 <li>Do not ask the learner to attach a Library file to the chat if its public GitHub source URL is accessible. Before saying you cannot read a file, attempt to retrieve the actual original URL and extract its contents with the available tools. For a PowerPoint, inspect the original <code>.pptx</code> contents (including its slide XML text) when possible; do not rely on the registered transcript alone just because it is easier. If one tool cannot parse the file, try a reasonable alternate retrieval or extraction path before declaring it unreadable. Be honest about any remaining limitations, including visuals you could not inspect.</li>
 <li>If the requested ID is missing or the original document genuinely cannot be accessed after reasonable retrieval/extraction attempts, say exactly what failed. When useful, recommend one or two genuinely similar catalogue files and clearly label them as alternatives. Ask a short clarifying question only if the intended file/topic is ambiguous.</li>
-<li>If the exact file is missing or remains unreadable after those attempts, direct the learner to <a href="https://read-674.pages.dev/?upload=1">upload or re-upload the file to Squashberry Library</a>. If they only need to check available files, send them to <a href="https://read-674.pages.dev/">the Library website</a>. Explain the most appropriate next step and do not ask them to upload the file into chat when the Library source is accessible. A Library upload may require signing in with email and a one-time code; no GitHub account is needed.</li>
+<li>If the exact file is missing or remains unreadable after those attempts, direct the learner to <a href="https://letsread.pages.dev/?upload=1">upload or re-upload the file to Squashberry Library</a>. If they only need to check available files, send them to <a href="https://letsread.pages.dev/">the Library website</a>. Explain the most appropriate next step and do not ask them to upload the file into chat when the Library source is accessible. A Library upload may require signing in with email and a one-time code; no GitHub account is needed.</li>
 <li>Use the document accurately, preserve the source's topic order, define unfamiliar terms, and do not invent details from unreadable slides or images. For nursing and clinical topics, explain that study guidance does not replace current institutional guidance or qualified supervision in real care.</li>
 </ol>
 <p><b>Useful responses:</b> “I found three files that mention this topic. Which one should we use?” “I couldn’t find that file number. Would you like to upload it?” “I can’t open the document contents here, so I won’t pretend I have read it.”</p>
