@@ -522,6 +522,23 @@ html.splash-lock,body.splash-lock{overflow:hidden!important}
 #splashBoot.fallback .splash-boot-mark{animation:splash-boot-pulse 1.5s ease-in-out infinite alternate}
 @keyframes splash-boot-pulse{to{transform:scale(1.06);box-shadow:0 18px 38px rgba(63,111,232,.42)}}
 
+
+.upload-title-confirm-backdrop{position:fixed;inset:0;z-index:160;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(8,12,35,.72);backdrop-filter:blur(10px);animation:fade .2s both}
+.upload-title-confirm-card{width:min(540px,100%);max-height:min(88dvh,780px);overflow:auto;padding:26px;border:1px solid var(--line);border-radius:28px;background:var(--shell);color:var(--ink);box-shadow:0 35px 100px rgba(5,10,35,.48);animation:sheet .3s cubic-bezier(.16,1,.3,1) both}
+.upload-title-confirm-icon{display:grid;place-items:center;width:48px;height:48px;margin-bottom:14px;border-radius:16px;background:var(--blue-t);color:var(--blue);font-size:24px}
+.upload-title-confirm-card h2{margin:7px 0 9px;font-size:23px;line-height:1.18;font-weight:850;letter-spacing:-.03em}
+.upload-title-confirm-card>p{font-size:13px;line-height:1.6;color:var(--soft);margin-bottom:16px}
+.upload-title-confirm-list{display:flex;flex-direction:column;gap:10px;max-height:48dvh;overflow:auto;padding-right:3px}
+.upload-title-confirm-row{padding:13px;border:1px solid var(--line);border-radius:16px;background:var(--chip)}
+.upload-title-confirm-file{display:flex;flex-direction:column;gap:3px;margin-bottom:11px;min-width:0}
+.upload-title-confirm-file strong{font-size:12.5px;overflow-wrap:anywhere}
+.upload-title-confirm-file small{font-size:11px;color:var(--muted)}
+.upload-title-confirm-row label{display:block;margin-bottom:6px;font-size:11.5px;font-weight:800;color:var(--soft)}
+.upload-title-confirm-input{width:100%;min-height:43px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:600 13px inherit;outline:none}
+.upload-title-confirm-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-t)}
+.upload-title-confirm-input.invalid{border-color:var(--bad)}
+@media(max-width:520px){.upload-title-confirm-card{padding:20px;border-radius:23px}.upload-title-confirm-card h2{font-size:21px}.upload-title-confirm-card .modal-actions{display:grid;grid-template-columns:1fr 1fr}.upload-title-confirm-card .modal-actions button{width:100%}}
+
 </style>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Squashberry Library","url":"https://squashberry.github.io/Read/","applicationCategory":"EducationalApplication","operatingSystem":"Any","description":"Organise study materials, find learning files, practise exam questions and revise with ChatGPT."}</script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8300142911609765"
@@ -1061,6 +1078,7 @@ function openNewUploadCollection(cfg){
 
 let uploadQueue=[];
 let uploadReviewDone=false;
+let uploadTitleConfirmOpen=false;
 let uploadDone=false;
 let uploadManualAvailable=false;
 function uploadDefaultTitle(file){return niceName(file.name).slice(0,90)||"Study material"}
@@ -1092,6 +1110,55 @@ function renderUploadPreview(){
   renderUploadPreview();syncUploadButton();
  }));
 }
+
+function closeUploadTitleConfirmation(){
+ const popup=$("uploadTitleConfirmBackdrop");
+ if(popup)popup.remove();
+ uploadTitleConfirmOpen=false;
+}
+function openUploadTitleConfirmation(cfg){
+ const pending=uploadQueue.map((item,index)=>({item,index})).filter(row=>row.item.aiFailed&&!row.item.titleConfirmed);
+ if(!pending.length||uploadTitleConfirmOpen)return;
+ closeUploadTitleConfirmation();
+ uploadTitleConfirmOpen=true;
+ const multiple=pending.length>1;
+ const list=pending.map(({item,index})=>{
+  const ext=extOf(item.file.name).toUpperCase()||"FILE";
+  const title=String(item.title||uploadDefaultTitle(item.file));
+  return '<div class="upload-title-confirm-row"><div class="upload-title-confirm-file"><strong>'+esc(item.file.name)+'</strong><small>'+esc(ext)+' · Squashberry needs your help with this title</small></div><label for="confirmUploadTitle'+index+'">Confirm or edit title</label><input class="upload-title-confirm-input" id="confirmUploadTitle'+index+'" data-confirm-upload-title="'+index+'" maxlength="90" value="'+esc(title)+'" autocomplete="off"></div>';
+ }).join("");
+ const popup=document.createElement("div");
+ popup.className="upload-title-confirm-backdrop";
+ popup.id="uploadTitleConfirmBackdrop";
+ popup.setAttribute("role","dialog");
+ popup.setAttribute("aria-modal","true");
+ popup.setAttribute("aria-labelledby","uploadTitleConfirmHeading");
+ popup.innerHTML='<section class="upload-title-confirm-card"><div class="upload-title-confirm-icon" aria-hidden="true">✎</div><div class="eyebrow">QUICK TITLE CHECK</div><h2 id="uploadTitleConfirmHeading">'+(multiple?"A few titles need your help":"One quick title check")+'</h2><p>'+(multiple
+  ?"Oh_uh… Squashberry couldn’t automatically generate titles for these files. Confirm each title below so your uploads can continue."
+  :"Oh_uh… Squashberry couldn’t automatically generate a title for this "+esc(extOf(pending[0].item.file.name).toUpperCase()||"file")+". Confirm below if this is the correct title.")+'</p><div class="upload-title-confirm-list">'+list+'</div><div class="modal-actions"><button class="primary-btn" id="confirmUploadTitles">Yes, continue</button><button class="outline-btn" id="cancelUploadTitleConfirm" type="button">Cancel</button></div></section>';
+ document.body.appendChild(popup);
+ popup.querySelectorAll("[data-confirm-upload-title]").forEach(input=>input.addEventListener("input",()=>{
+  const item=uploadQueue[Number(input.dataset.confirmUploadTitle)];
+  if(item)item.title=input.value;
+ }));
+ $("confirmUploadTitles").onclick=()=>{
+  let valid=true;
+  popup.querySelectorAll("[data-confirm-upload-title]").forEach(input=>{
+   const item=uploadQueue[Number(input.dataset.confirmUploadTitle)];
+   const title=String(input.value||"").trim();
+   if(!title){valid=false;input.classList.add("invalid");return}
+   input.classList.remove("invalid");
+   if(item){item.title=title;item.titleConfirmed=true}
+  });
+  if(!valid){toast("Please enter a title for every listed file.");return}
+  closeUploadTitleConfirmation();
+  handleEasyUpload(cfg);
+ };
+ $("cancelUploadTitleConfirm").onclick=closeUploadTitleConfirmation;
+ const first=popup.querySelector("[data-confirm-upload-title]");
+ if(first)first.focus();
+}
+
 function syncUploadButton(){
  const button=$("uploadSubmit");if(!button)return;
  const rejected=uploadQueue.some(item=>item.review&&item.review.relevant===false);
@@ -1213,7 +1280,7 @@ async function reviewSelectedUploads(){
    item.review=review;item.reviewToken=review.reviewToken||"";
    if(review.relevant===true){
     item.title=review.title||item.title;item.reviewError="";
-    if(review.manualReview&&!review.aiReviewed){item.aiFailed=true;item.titleConfirmed=false;}
+    if((review.manualReview&&!review.aiReviewed)||!String(review.title||"").trim()){item.aiFailed=true;item.titleConfirmed=false;}
     else if(!item.aiFailed){item.titleConfirmed=true;}
     if(item.aiFailed)item.reviewError=review.reason||"AI review unavailable. Confirm this title.";
    }else{
@@ -1257,8 +1324,8 @@ function openEasyUploadModal(cfg,destination={type:"individual"}){
  const collectionName=uploadDestination.type==="existing"?(uploadDestination.collection&&uploadDestination.collection.name||""):uploadDestination.type==="new"?(uploadDestination.name||""):"";
  $("modalKicker").textContent=collectionName?"ADD TO COLLECTION":"ADD TO LIBRARY";
  $("modalTitle").textContent=collectionName?"Upload to "+collectionName:"Upload individual files";
- $("modalDescription").textContent=collectionName?"Choose up to four files. They will be added to "+collectionName+".":"Choose up to four files. They will stay as individual uploads, not part of a collection.";
- $("modalBody").innerHTML='<div class="upload-form"><div class="upload-destination-summary"><span>▦</span><div><strong>'+(collectionName?"Saving to "+esc(collectionName):"Saving as individual files")+'</strong><small>'+(collectionName?"All files here will be grouped together for whole-collection study.":"You can still open and study each uploaded file from your Library.")+'</small></div><button class="upload-change-destination" id="uploadChangeDestination" type="button">Change</button></div><div><label for="uploadFiles">Choose study files (up to 4, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">No files selected yet.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>I understand that uploaded files are public and can be opened by other Library users.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are study materials such as notes, slides, handouts or revision documents.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload files ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
+ $("modalDescription").textContent=collectionName?"Choose up to 24 files. They will be added to "+collectionName+".":"Choose up to 24 files. They will stay as individual uploads, not part of a collection.";
+ $("modalBody").innerHTML='<div class="upload-form"><div class="upload-destination-summary"><span>▦</span><div><strong>'+(collectionName?"Saving to "+esc(collectionName):"Saving as individual files")+'</strong><small>'+(collectionName?"All files here will be grouped together for whole-collection study.":"You can still open and study each uploaded file from your Library.")+'</small></div><button class="upload-change-destination" id="uploadChangeDestination" type="button">Change</button></div><div><label for="uploadFiles">Choose study files (up to 24, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">No files selected yet.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>I understand that uploaded files are public and can be opened by other Library users.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are study materials such as notes, slides, handouts or revision documents.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload files ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
  $("modalBackdrop").classList.add("show");
  $("cancelUpload").onclick=()=>{uploadDestination={type:"individual"};closeModal()};
  $("uploadChangeDestination").onclick=()=>{
@@ -1296,7 +1363,7 @@ async function handleEasyUpload(cfg){
  const category=collectionName||"Uncategorised";
  if(destination.type==="existing"&&(destination.collection.files||[]).length+uploadQueue.length>80){toast("A collection can hold up to 80 documents. Remove some files before adding more.");return}
  if(!uploadQueue.length){toast("Choose at least one study file.");return}
- if(uploadQueue.length>4){toast("Choose no more than four files at a time.");return}
+ if(uploadQueue.length>24){toast("Choose no more than 24 files at a time.");return}
  if(!ack.checked){toast("Please confirm that these files can be public.");return}
  if(!studyAck.checked){toast("Please confirm that these are study materials.");return}
  if(uploadQueue.some(item=>item.file.size<=0||item.file.size>8*1024*1024)){toast("Each file must be smaller than 8 MB.");return}
@@ -1307,15 +1374,9 @@ async function handleEasyUpload(cfg){
   if(!uploadReviewDone){
    await reviewSelectedUploads();
    if(!uploadReviewDone)return;
-   if(uploadQueue.some(item=>item.aiFailed&&!item.titleConfirmed)){
-    setUploadProgress("Squashberry couldn't generate a file title. Confirm the editable title to continue.",100,false);
-    syncUploadButton();return;
-   }
-  }else{
-   const unconfirmed=uploadQueue.filter(item=>item.aiFailed&&!item.titleConfirmed);
-   if(unconfirmed.some(item=>!String(item.title||"").trim())){toast("Enter a file title first.");return}
-   unconfirmed.forEach(item=>{item.titleConfirmed=true});
   }
+  const unconfirmedTitles=uploadQueue.filter(item=>item.aiFailed&&!item.titleConfirmed);
+  if(unconfirmedTitles.length){openUploadTitleConfirmation(cfg);return}
   setUploadProgress("Uploading files…",8,true);
   const form=new FormData(),transcriptMeta=[],reviewTokens=[];
   uploadQueue.forEach(item=>{
