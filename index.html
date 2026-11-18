@@ -406,6 +406,38 @@ body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
 .modal-kicker{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
 .upload-file-main{min-width:0}
 #library>.section-head:first-child,#prompts>.section-head:first-child,#you>.section-head:first-child{margin-top:4px}
+
+/* Discovery shelf rotation */
+#discoveryTitle, #discoverySub{transition:opacity .22s ease,transform .22s ease}
+#discoveryTitle.discovery-copy-out, #discoverySub.discovery-copy-out{opacity:0;transform:translateY(8px)}
+#discoveryTitle.discovery-copy-in, #discoverySub.discovery-copy-in{animation:discovery-copy-in .42s cubic-bezier(.16,1,.3,1) both}
+#forYou{transition:opacity .22s ease,transform .22s ease}
+#forYou.discovery-out{opacity:0;transform:translateY(10px)}
+#forYou.discovery-enter{animation:discovery-shelf-in .46s cubic-bezier(.16,1,.3,1) both}
+@keyframes discovery-copy-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes discovery-shelf-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.discovery-category .wide-cover{width:92px}
+.discovery-category .wide-stats{margin-top:15px}
+.discovery-category .wide-stats strong{font-size:16px}
+.discovery-category .go{pointer-events:none}
+.discovery-category:hover .go{transform:translateX(3px)}
+
+/* The right-side file cover gives a small, deliberate wiggle, then rests. */
+.detail-cover{transform-origin:50% 76%;animation:preview-cover-wiggle 7.2s ease-in-out infinite}
+@keyframes preview-cover-wiggle{
+  0%,14%,100%{transform:rotate(0deg) translateY(0)}
+  2%{transform:rotate(-2.2deg) translateY(-2px)}
+  4%{transform:rotate(2deg) translateY(-1px)}
+  6%{transform:rotate(-1.35deg) translateY(0)}
+  8%{transform:rotate(1deg) translateY(0)}
+  10%{transform:rotate(-.35deg) translateY(0)}
+  12%{transform:rotate(0deg) translateY(0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .detail-cover{animation:none!important}
+  #discoveryTitle,#discoverySub,#forYou{transition:none!important;animation:none!important}
+}
+
 </style>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Squashberry Library","url":"https://squashberry.github.io/Read/","applicationCategory":"EducationalApplication","operatingSystem":"Any","description":"Organise study materials, find learning files, practise exam questions and revise with ChatGPT."}</script>
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8300142911609765"
@@ -430,14 +462,14 @@ body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
 <button class="nav-item" data-nav="prompts"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h8l4 4v13H7z"/><path d="M15 3.5v4h4M10 12h6M10 15.5h6"/><path d="M4 6.5v14h11"/></svg></span><span>Prompts</span></button>
 <button class="nav-item" data-nav="you"><span class="nav-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.8 20c.5-3.6 3.1-5.5 7.2-5.5s6.7 1.9 7.2 5.5"/></svg></span><span>You</span></button>
 </nav></div>
-<label class="searchbox"><input id="search" type="search" placeholder="Topic, file name or code (e.g. 012)" autocomplete="off" aria-label="Search library by topic, filename, or document code"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></label>
+<label class="searchbox"><input id="search" type="search" placeholder="Search topics or file code (e.g. 012)" autocomplete="off" aria-label="Search library by topic, filename, or document code"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></label>
 <div class="top-actions"><button class="icon-btn" id="themeBtn" aria-label="Toggle appearance" title="Toggle appearance">☼</button><button class="icon-btn" id="refreshBtn" aria-label="Refresh library" title="Refresh library">↻</button><button class="outline-btn account-top-btn" id="headerAccountBtn" type="button">Sign in ↗</button></div>
 </header>
 <main>
 <section id="home">
 <div class="intro-strip"><div><div class="eyebrow">A little room to think</div><h1>Welcome to Squashberry’s <span>private library.</span></h1><p>Your notes, presentations and study material — gathered in one calm little corner. Read deeply, understand properly, then let the AI help you practise until it sticks.</p><div class="found-chip"><b id="artFileCount">Your materials</b><span id="artFileSub">Gathering your notes…</span></div></div>
 <div class="hero-btns"><button class="primary-btn" id="exploreBtn">Explore your library ↗</button><button class="outline-btn" id="chatLibraryBtn">✳ Study with ChatGPT</button></div></div>
-<div class="section-head"><div><h2 class="section-title">For you</h2><p class="section-sub">Freshly added to your shelf.</p></div><div class="quiet-pill"><span class="live-dot"></span><span id="statusPill">Shh… it’s quiet here</span></div></div>
+<div class="section-head"><div><h2 class="section-title discovery-copy" id="discoveryTitle" aria-live="polite" aria-atomic="true">For you</h2><p class="section-sub discovery-copy" id="discoverySub">Freshly added to your shelf.</p></div><div class="quiet-pill"><span class="live-dot"></span><span id="statusPill">Shh… it’s quiet here</span></div></div>
 <div class="for-you" id="forYou"><div class="wide ghost"><div class="wide-cover"></div><div class="wide-info"><h3>Loading</h3><p class="wide-by">Loading</p></div></div><div class="wide ghost"><div class="wide-cover"></div><div class="wide-info"><h3>Loading</h3><p class="wide-by">Loading</p></div></div></div>
 </section>
 <section id="study"><div class="section-head"><div><h2 class="section-title">What are we learning today?</h2><p class="section-sub">Pick a path. The kettle is metaphorically on.</p></div><button class="tiny-link" id="studyAllBtn">See all ↗</button></div><div class="feature-grid">
@@ -516,6 +548,8 @@ window.LIBRARY_UPLOAD_CONFIG = Object.assign({
 "use strict";
 const OWNER="squashberry",REPO="Read",BRANCH="master",INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html";
 const files=[], manifest={version:1,items:[]}, state={filter:"all",query:"",selected:null,theme:localStorage.getItem("library-theme")||"light",welcomeDone:localStorage.getItem("library-welcome")==="1",name:localStorage.getItem("library-name")||"",pushEnabled:false,pushTime:"08:00"};
+let discoverySections=[], discoveryIndex=0, discoveryTimer=null, discoverySwapTimer=null;
+const READ_COUNTS_KEY="library-open-counts-v1";
 const popupVisitCount=(Number.parseInt(localStorage.getItem("library-popup-visits")||"0",10)||0)+1;
 localStorage.setItem("library-popup-visits",String(popupVisitCount));
 const showPopupThisVisit=popupVisitCount===1||popupVisitCount%3===0;
@@ -586,14 +620,182 @@ function renderDetail(file){
  $("detailCards").onclick=()=>{logAccountActivity("started-study","Started flashcards study session");openChat(promptFor("flashcards",file))};
  hydrateDetail(file)
 }
+function getFileOpenCounts(){
+ try{
+  const value=JSON.parse(localStorage.getItem(READ_COUNTS_KEY)||"{}");
+  return value&&typeof value==="object"&&!Array.isArray(value)?value:{};
+ }catch(error){return {}}
+}
+function getFileOpenCount(file,counts){
+ return Math.max(0,Number((counts||getFileOpenCounts())[file.path])||0);
+}
+function recordFileOpen(file){
+ if(!file)return;
+ try{
+  const counts=getFileOpenCounts();
+  counts[file.path]=Math.min(999999,getFileOpenCount(file,counts)+1);
+  localStorage.setItem(READ_COUNTS_KEY,JSON.stringify(counts));
+ }catch(error){console.warn("Could not save local read count",error)}
+}
+function discoveryCategory(file){
+ return String(file.category||categoryOf(file)||"Study files").trim()||"Study files";
+}
+function buildDiscoverySections(study){
+ const counts=getFileOpenCounts();
+ const sections=[];
+ if(!study.length)return sections;
+ sections.push({
+  id:"for-you",title:"For you",subtitle:"Freshly added to your shelf.",
+  type:"files",items:study.slice(-2).reverse()
+ });
+ if(study.length>=2){
+  const ranked=study.slice().sort((a,b)=>
+   getFileOpenCount(a,counts)-getFileOpenCount(b,counts)||
+   (Number(fileId(b))||0)-(Number(fileId(a))||0)
+  );
+  const recommended=[],seenCategories=new Set();
+  ranked.forEach(file=>{
+   const key=discoveryCategory(file).toLowerCase();
+   if(!seenCategories.has(key)&&recommended.length<2){
+    seenCategories.add(key);recommended.push(file);
+   }
+  });
+  ranked.forEach(file=>{
+   if(recommended.length<2&&!recommended.some(item=>item.path===file.path))recommended.push(file);
+  });
+  if(recommended.length)sections.push({
+   id:"recommended",title:"Recommended",
+   subtitle:"A balanced mix from the sections on your shelf.",
+   type:"files",items:recommended
+  });
+ }
+ const grouped=new Map();
+ study.forEach(file=>{
+  const name=discoveryCategory(file),key=name.toLowerCase();
+  if(!grouped.has(key))grouped.set(key,{name,files:[]});
+  grouped.get(key).files.push(file);
+ });
+ const categories=Array.from(grouped.values()).sort((a,b)=>
+  b.files.length-a.files.length||a.name.localeCompare(b.name)
+ );
+ if(categories.length>1)sections.push({
+  id:"categories",title:"Categories",
+  subtitle:"Jump straight into a section of your study library.",
+  type:"categories",groups:categories
+ });
+ const mostRead=study.filter(file=>getFileOpenCount(file,counts)>0).sort((a,b)=>
+  getFileOpenCount(b,counts)-getFileOpenCount(a,counts)||
+  (Number(fileId(b))||0)-(Number(fileId(a))||0)
+ ).slice(0,2);
+ if(mostRead.length)sections.push({
+  id:"most-read",title:"Most read",
+  subtitle:"Ranked by the files you have opened on this device.",
+  type:"files",items:mostRead,showReadCount:true,counts
+ });
+ return sections;
+}
+function renderDiscoveryFileCards(items,section){
+ const counts=section.counts||getFileOpenCounts();
+ return items.map(file=>{
+  const ext=extOf(file.name),opened=getFileOpenCount(file,counts);
+  const meta=discoveryCategory(file)+(file.uploadedBy?" · "+file.uploadedBy:"")+
+   (section.showReadCount?" · Opened "+opened+" "+(opened===1?"time":"times"):"");
+  return '<article class="wide" data-file="'+esc(file.path)+'" role="button" tabindex="0" aria-label="'+esc(niceName(file.name))+'"><div class="wide-cover">'+coverHTML(file)+'</div><div class="wide-info"><h3>'+esc(niceName(file.name))+'</h3><p class="wide-by">'+esc(meta)+'</p><div class="wide-stats"><div><strong>'+esc(fileId(file))+'</strong><span>file no.</span></div><div><strong>'+esc(prettySize(file.size))+'</strong><span>size</span></div><div><strong>'+esc(iconFor(ext))+'</strong><span>format</span></div></div></div><button class="go" type="button" data-open="'+esc(file.path)+'" aria-label="Open '+esc(niceName(file.name))+'">'+chevronSVG+'</button></article>';
+ }).join("");
+}
+function openDiscoveryCategory(category){
+ state.query=String(category||"");
+ state.filter="all";
+ const search=$("search");if(search)search.value=state.query;
+ gotoSection("library");
+ renderFiles();
+}
+function renderDiscoverySection(index,animate=false){
+ const title=$("discoveryTitle"),subtitle=$("discoverySub"),box=$("forYou");
+ if(!title||!subtitle||!box||!discoverySections.length)return;
+ const section=discoverySections[index]||discoverySections[0];
+ if(discoverySwapTimer){clearTimeout(discoverySwapTimer);discoverySwapTimer=null}
+ const paint=()=>{
+  title.textContent=section.title;
+  subtitle.textContent=section.subtitle;
+  if(section.type==="categories"){
+   box.innerHTML=section.groups.map(group=>{
+    const newest=group.files.slice().sort((a,b)=>(Number(fileId(b))||0)-(Number(fileId(a))||0))[0];
+    const formats=new Set(group.files.map(file=>iconFor(extOf(file.name)))).size;
+    return '<article class="wide discovery-category" data-category="'+esc(group.name)+'" role="button" tabindex="0" aria-label="Explore '+esc(group.name)+'"><div class="wide-cover">'+coverHTML(newest)+'</div><div class="wide-info"><h3>'+esc(group.name)+'</h3><p class="wide-by">A section in your study library</p><div class="wide-stats"><div><strong>'+group.files.length+'</strong><span>files</span></div><div><strong>'+formats+'</strong><span>formats</span></div></div></div><span class="go" aria-hidden="true">'+chevronSVG+'</span></article>';
+   }).join("");
+   box.querySelectorAll(".discovery-category").forEach(el=>{
+    const open=()=>openDiscoveryCategory(el.dataset.category);
+    el.addEventListener("click",open);
+    el.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();open()}});
+   });
+  }else{
+   box.innerHTML=renderDiscoveryFileCards(section.items,section);
+   box.querySelectorAll(".wide[data-file]").forEach(el=>{
+    const pick=()=>selectFile(files.find(file=>file.path===el.dataset.file),true);
+    el.addEventListener("click",pick);
+    el.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();pick()}});
+   });
+   box.querySelectorAll(".go[data-open]").forEach(button=>button.addEventListener("click",event=>{
+    event.stopPropagation();openFile(files.find(file=>file.path===button.dataset.open));
+   }));
+  }
+  box.classList.remove("discovery-out");
+  title.classList.remove("discovery-copy-out");
+  subtitle.classList.remove("discovery-copy-out");
+  box.classList.remove("discovery-enter");
+  title.classList.remove("discovery-copy-in");
+  subtitle.classList.remove("discovery-copy-in");
+  if(animate){
+   void box.offsetWidth;
+   box.classList.add("discovery-enter");
+   title.classList.add("discovery-copy-in");
+   subtitle.classList.add("discovery-copy-in");
+   discoverySwapTimer=window.setTimeout(()=>{
+    box.classList.remove("discovery-enter");
+    title.classList.remove("discovery-copy-in");
+    subtitle.classList.remove("discovery-copy-in");
+    discoverySwapTimer=null;
+   },520);
+  }
+  markSelected();
+ };
+ if(animate){
+  title.classList.add("discovery-copy-out");
+  subtitle.classList.add("discovery-copy-out");
+  box.classList.add("discovery-out");
+  discoverySwapTimer=window.setTimeout(paint,210);
+ }else paint();
+}
+function stopDiscoveryRotation(){
+ if(discoveryTimer){window.clearInterval(discoveryTimer);discoveryTimer=null}
+}
+function startDiscoveryRotation(){
+ stopDiscoveryRotation();
+ if(document.hidden||document.documentElement.dataset.view!=="home"||discoverySections.length<2)return;
+ if(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+ discoveryTimer=window.setInterval(()=>{
+  if(document.hidden||document.documentElement.dataset.view!=="home")return;
+  discoveryIndex=(discoveryIndex+1)%discoverySections.length;
+  renderDiscoverySection(discoveryIndex,true);
+ },7200);
+}
 function renderForYou(){
  const box=$("forYou");if(!box)return;
  const study=files.filter(isStudyFile);
- if(!study.length){box.innerHTML='<div class="empty-state" style="grid-column:1/-1"><strong>Nothing on the shelf yet.</strong>Upload your first study file from the Library tab.</div>';return}
- box.innerHTML=study.slice(-2).reverse().map(f=>{const ext=extOf(f.name);return '<article class="wide" data-file="'+esc(f.path)+'" role="button" tabindex="0" aria-label="'+esc(niceName(f.name))+'"><div class="wide-cover">'+coverHTML(f)+'</div><div class="wide-info"><h3>'+esc(niceName(f.name))+'</h3><p class="wide-by">'+esc(categoryOf(f))+(f.uploadedBy?" · "+esc(f.uploadedBy):"")+'</p><div class="wide-stats"><div><strong>'+esc(fileId(f))+'</strong><span>file no.</span></div><div><strong>'+esc(prettySize(f.size))+'</strong><span>size</span></div><div><strong>'+esc(iconFor(ext))+'</strong><span>format</span></div></div></div><button class="go" type="button" data-open="'+esc(f.path)+'" aria-label="Open '+esc(niceName(f.name))+'">'+chevronSVG+'</button></article>'}).join("");
- box.querySelectorAll(".wide").forEach(el=>{const pick=()=>selectFile(files.find(f=>f.path===el.dataset.file),true);el.addEventListener("click",pick);el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();pick()}})});
- box.querySelectorAll(".go").forEach(b=>b.addEventListener("click",e=>{e.stopPropagation();openFile(files.find(f=>f.path===b.dataset.open))}));
- markSelected()
+ const activeId=discoverySections[discoveryIndex]&&discoverySections[discoveryIndex].id;
+ discoverySections=buildDiscoverySections(study);
+ if(!discoverySections.length){
+  stopDiscoveryRotation();
+  $("discoveryTitle").textContent="For you";
+  $("discoverySub").textContent="Freshly added to your shelf.";
+  box.innerHTML='<div class="empty-state" style="grid-column:1/-1"><strong>Nothing on the shelf yet.</strong>Upload your first study file from the Library tab.</div>';
+  return;
+ }
+ const preserved=discoverySections.findIndex(section=>section.id===activeId);
+ discoveryIndex=preserved>=0?preserved:0;
+ renderDiscoverySection(discoveryIndex,false);
+ startDiscoveryRotation();
 }
 function syncSelection(){
  const study=files.filter(isStudyFile);
@@ -617,14 +819,14 @@ return basePrompt()+"\n"+command;
 function startStudy(mode){logAccountActivity("started-study","Started "+(mode||"a")+" study session");showStudyPicker(mode)}
 function showStudyPicker(mode){const selected=state.selected;const titles={read:"Read & understand",lecture:"A proper lecture",exam:"Build an exam",flashcards:"Flashcards"};const descriptions={read:"Make the material make sense, not just make it shorter.",lecture:"A calm, complete lecture — one idea at a time.",exam:"Questions based on your own materials, with feedback.",flashcards:"A better way to make the facts stick."};$("modalKicker").textContent="YOUR AI STUDY DESK";$("modalTitle").textContent=titles[mode]||"Study desk";$("modalDescription").textContent=descriptions[mode]||"Choose a source file and start learning.";const options='<option value="">Choose a file (or let ChatGPT choose)</option>'+files.filter(isStudyFile).map(f=>'<option value="'+esc(f.path)+'" '+(selected&&selected.path===f.path?'selected':'')+'>ID '+esc(fileId(f))+' · '+esc(f.name)+'</option>').join("");$("modalBody").innerHTML='<div class="prompt-card"><h3>Choose what to study</h3><p>Choose a numbered learning document to focus on, or let ChatGPT help you find the right material.</p></div><div style="margin-top:15px"><select id="studySource" style="width:100%;padding:14px 13px;border-radius:13px;border:1px solid var(--line);background:var(--bg);color:var(--text)">'+options+'</select></div><div class="modal-actions"><button class="primary-btn" id="launchStudy">Start with ChatGPT ↗</button><button class="outline-btn" id="copyStudy">Copy study prompt</button></div><p style="font-size:11px;line-height:1.7;color:var(--muted);margin-top:16px">ChatGPT opens in a new tab. You may need to be signed in. It must be able to retrieve the source file to teach from it.</p>';$("modalBackdrop").classList.add("show");$("launchStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;state.selected=file;openChat(promptFor(mode,file));closeModal()};$("copyStudy").onclick=function(){const file=files.find(f=>f.path===$("studySource").value)||null;copyText(promptFor(mode,file))}}
 function isStudyFile(f){const n=(f.name||"").toLowerCase(),p=(f.path||"").toLowerCase();if(["index.html","readme.md","llms.txt","library-index.json",".gitignore",".nojekyll","pages.yml"].includes(n)||p.startsWith(".github/")||n.endsWith(".css")||n.endsWith(".js")||n.endsWith(".yaml")||n.endsWith(".yml"))return false;return ["pptx","ppt","pdf","docx","doc","txt","md","rtf"].includes(extOf(f.name))}
-function filteredFiles(){return files.filter(f=>{if(!isStudyFile(f))return false;const ext=extOf(f.name);const filterOk=state.filter==="all"||(state.filter==="pptx"&&["pptx","ppt"].includes(ext))||(state.filter==="pdf"&&ext==="pdf")||(state.filter==="other"&&!["pptx","ppt","pdf"].includes(ext));const q=state.query.toLowerCase().trim();const code=fileId(f).toLowerCase();const searchText=(f.name+" "+f.path+" "+String(f.category||"")+" "+code+" file "+code+" id "+code).toLowerCase();const searchOk=!q||searchText.includes(q);return filterOk&&searchOk}).sort((a,b)=>a.name.localeCompare(b.name))}
+function filteredFiles(){return files.filter(f=>{if(!isStudyFile(f))return false;const ext=extOf(f.name);const filterOk=state.filter==="all"||(state.filter==="pptx"&&["pptx","ppt"].includes(ext))||(state.filter==="pdf"&&ext==="pdf")||(state.filter==="other"&&!["pptx","ppt","pdf"].includes(ext));const q=state.query.toLowerCase().trim();const code=fileId(f).toLowerCase();const searchText=(f.name+" "+f.path+" "+String(f.category||"")+" "+categoryOf(f)+" "+code+" file "+code+" id "+code).toLowerCase();const searchOk=!q||searchText.includes(q);return filterOk&&searchOk}).sort((a,b)=>a.name.localeCompare(b.name))}
 function renderFiles(){const shown=filteredFiles(),studyCount=files.filter(isStudyFile).length;$("libraryStatus").textContent=studyCount+" study materials · "+shown.length+" shown";$("artFileCount").textContent=studyCount+" files found";$("artFileSub").textContent=studyCount?"Ready when you are.":"Waiting for the files.";if(!shown.length){$("fileGrid").innerHTML='<div class="empty-state"><strong>No files on this shelf — yet.</strong>Try another search or upload material from your files. Website code is deliberately kept off these shelves.</div>';populatePromptSources();return}
 $("fileGrid").innerHTML=shown.map(f=>'<article class="file-card" data-file="'+esc(f.path)+'"><button class="file-card-save" type="button" data-save="'+esc(f.path)+'">'+(isReadLater(f)?"✓ Saved":"＋ Read later")+'</button><button class="file-card-open" type="button" data-open-card="'+esc(f.path)+'">'+coverHTML(f)+'<div class="file-name">'+esc(niceName(f.name))+'</div><div class="file-meta"><span>'+esc(categoryOf(f))+' · ID '+esc(fileId(f))+'</span><span class="tag">'+prettySize(f.size)+'</span></div><div class="file-attribution">'+(f.uploadedBy?'Uploaded by '+esc(f.uploadedBy):'Library study material')+'</div></button></article>').join("");
 document.querySelectorAll("[data-open-card]").forEach(el=>el.addEventListener("click",()=>selectFile(files.find(f=>f.path===el.dataset.openCard),true)));
 document.querySelectorAll("[data-save]").forEach(el=>el.addEventListener("click",()=>toggleReadLater(files.find(f=>f.path===el.dataset.save))));
 markSelected();populatePromptSources()}
 function closeModal(){$("modalBackdrop").classList.remove("show")}
-function openFile(file){if(!file)return;logAccountActivity("opened-file","Opened file "+fileId(file)+" · "+file.name);if(!state.selected||state.selected.path!==file.path)selectFile(file,false);state.selected=file;const ext=extOf(file.name);$("modalKicker").textContent="FILE "+fileId(file)+" · "+iconFor(ext)+" · "+prettySize(file.size);$("modalTitle").textContent=niceName(file.name);$("modalDescription").textContent=(file.uploadedBy?"Uploaded by "+file.uploadedBy+". ":"")+"From Squashberry’s /Read library. Choose how you want to work with it.";
+function openFile(file){if(!file)return;recordFileOpen(file);renderForYou();logAccountActivity("opened-file","Opened file "+fileId(file)+" · "+file.name);if(!state.selected||state.selected.path!==file.path)selectFile(file,false);state.selected=file;const ext=extOf(file.name);$("modalKicker").textContent="FILE "+fileId(file)+" · "+iconFor(ext)+" · "+prettySize(file.size);$("modalTitle").textContent=niceName(file.name);$("modalDescription").textContent=(file.uploadedBy?"Uploaded by "+file.uploadedBy+". ":"")+"From Squashberry’s /Read library. Choose how you want to work with it.";
 let preview="";if(ext==="pdf"){preview='<iframe class="reader-preview" title="PDF preview" src="'+esc(file.download_url)+'#toolbar=0"></iframe>'}else if(["ppt","pptx","doc","docx","xls","xlsx"].includes(ext)){const office="https://view.officeapps.live.com/op/embed.aspx?src="+encodeURIComponent(file.download_url);preview='<iframe class="reader-preview" title="Office preview" src="'+esc(office)+'" allowfullscreen></iframe><p style="font-size:11px;color:var(--muted);line-height:1.7">Office preview depends on Microsoft’s online viewer and may take a moment to load. Open the original file if the preview is unavailable.</p>'}else if(["txt","md","html","htm","rtf"].includes(ext)){preview='<div class="prompt-card"><p>Open or download the original file, or ask ChatGPT to explain it using the source link.</p></div>'}else{preview='<div class="prompt-card"><p>This file can be downloaded or sent to ChatGPT as a study source.</p></div>'}
 $("modalBody").innerHTML=preview+'<div class="modal-actions"><button class="primary-btn" id="fileLecture">Get a lecture ↗</button><button class="outline-btn" id="fileExam">Make an exam ↗</button><a class="outline-btn" style="display:inline-flex;align-items:center" href="'+esc(file.download_url)+'" target="_blank" rel="noopener">Download original ↗</a><button class="outline-btn" id="filePrompt">Copy study command</button></div><div class="prompt-card" style="margin-top:17px"><h3>Quiet study tip</h3><p>Read a section, close the file, then explain it in your own words. Use ChatGPT to fill gaps — not to replace the first attempt.</p></div>';
 $("modalBackdrop").classList.add("show");$("fileLecture").onclick=()=>{openChat(promptFor("lecture",file));closeModal()};$("fileExam").onclick=()=>{openChat(promptFor("exam",file));closeModal()};$("filePrompt").onclick=()=>copyText(promptFor("read",file))}
@@ -949,7 +1151,7 @@ async function copyShareMessage(){const message=shareMessage();let copied=false;
 async function useDeviceShare(){const data={title:"Library — Squashberry’s Private Library",text:shareMessage(),url:SHARE_URL};if(navigator.share){try{await navigator.share(data);toast("Ready to share — thanks for passing it along.");closeSharePopup()}catch(err){if(err&&err.name!=="AbortError")toast("Sharing wasn't available. Use the copy button instead.")}}else{copyShareMessage()}}
 function startPopupSequence(){if(!showPopupThisVisit)return;setTimeout(openOfficePopup,1750)}
 function closeWelcome(){state.welcomeDone=true;localStorage.setItem("library-welcome","1");$("welcomeBackdrop").classList.remove("show")}
-function updateNavIndicator(view){const nav=document.querySelector(".bottom-nav"),indicator=$("navIndicator"),active=nav&&nav.querySelector('[data-nav="'+view+'"]');if(!nav||!indicator||!active)return;indicator.style.width=active.offsetWidth+"px";indicator.style.transform="translateX("+active.offsetLeft+"px)"} function gotoSection(id){const view=["home","library","prompts","you"].includes(id)?id:"home";const visible=view==="home"?["home","study","homeMore"]:[view];["home","study","homeMore","library","prompts","you"].forEach(name=>{const element=$(name);if(element){element.classList.toggle("view-hidden",!visible.includes(name));if(visible.includes(name)){element.classList.remove("view-enter");void element.offsetWidth;element.classList.add("view-enter")}}});const footer=$("quietFooter");if(footer)footer.classList.toggle("view-hidden",view!=="home");document.querySelectorAll(".nav-item[data-nav]").forEach(n=>{const active=n.dataset.nav===view;n.classList.toggle("active",active);if(active)n.setAttribute("aria-current","page");else n.removeAttribute("aria-current")});document.documentElement.dataset.view=view;closeSheet();updateNavIndicator(view);if(view==="library")logAccountActivity("viewed-library","Opened the Library shelf");if(view==="you"){renderAccountPanel();if(authState.token&&authState.user)refreshDashboard();else setTimeout(()=>{if(document.documentElement.dataset.view==="you"&&(!authState.token||!authState.user))openAuthModal()},120)}window.scrollTo({top:0,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
+function updateNavIndicator(view){const nav=document.querySelector(".bottom-nav"),indicator=$("navIndicator"),active=nav&&nav.querySelector('[data-nav="'+view+'"]');if(!nav||!indicator||!active)return;indicator.style.width=active.offsetWidth+"px";indicator.style.transform="translateX("+active.offsetLeft+"px)"} function gotoSection(id){const view=["home","library","prompts","you"].includes(id)?id:"home";const visible=view==="home"?["home","study","homeMore"]:[view];["home","study","homeMore","library","prompts","you"].forEach(name=>{const element=$(name);if(element){element.classList.toggle("view-hidden",!visible.includes(name));if(visible.includes(name)){element.classList.remove("view-enter");void element.offsetWidth;element.classList.add("view-enter")}}});const footer=$("quietFooter");if(footer)footer.classList.toggle("view-hidden",view!=="home");document.querySelectorAll(".nav-item[data-nav]").forEach(n=>{const active=n.dataset.nav===view;n.classList.toggle("active",active);if(active)n.setAttribute("aria-current","page");else n.removeAttribute("aria-current")});document.documentElement.dataset.view=view;closeSheet();updateNavIndicator(view);if(view==="library")logAccountActivity("viewed-library","Opened the Library shelf");if(view==="you"){renderAccountPanel();if(authState.token&&authState.user)refreshDashboard();else setTimeout(()=>{if(document.documentElement.dataset.view==="you"&&(!authState.token||!authState.user))openAuthModal()},120)}if(view==="home")startDiscoveryRotation();else stopDiscoveryRotation();window.scrollTo({top:0,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"})}
 
 function apiBase(){const c=window.LIBRARY_UPLOAD_CONFIG||{};return String(c.endpoint||"").trim().replace(/\/+$/,"")}
 function supabaseAuthConfigured(){const c=window.LIBRARY_UPLOAD_CONFIG||{};return Boolean(c.supabaseUrl&&c.supabasePublishableKey)}
@@ -1077,7 +1279,7 @@ function installLibrary(){hideInstallBanner();if(deferredInstallPrompt){deferred
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;const status=$("installStatus");if(status)status.textContent="Ready to install on this device.";if(isLibraryInstalled())hideInstallBanner()});window.addEventListener("appinstalled",hideInstallBanner);$("installBannerNow").addEventListener("click",installLibrary);$("installBannerClose").addEventListener("click",hideInstallBanner);
 $("headerAccountBtn").addEventListener("click",()=>{if(authState.token&&authState.user)gotoSection("you");else openAuthModal()});$("exploreBtn").addEventListener("click",()=>gotoSection("library"));$("studyAllBtn").addEventListener("click",()=>showStudyPicker("read"));$("refreshBtn").addEventListener("click",loadFiles);$("themeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));$("uploadCta").addEventListener("click",openUploadModal);$("officeNotNow").addEventListener("click",closeOfficePopup);$("officeDownloadNow").addEventListener("click",closeOfficePopup);$("officeBackdrop").addEventListener("click",e=>{if(e.target===$("officeBackdrop"))closeOfficePopup()});$("shareNowBtn").addEventListener("click",copyShareMessage);$("deviceShareBtn").addEventListener("click",useDeviceShare);$("closeSharePopup").addEventListener("click",closeSharePopup);$("shareBackdrop").addEventListener("click",e=>{if(e.target===$("shareBackdrop"))closeSharePopup()});$("profileShareBtn").addEventListener("click",()=>openSharePopup(true));$("installAppBtn").addEventListener("click",installLibrary);$("profileThemeBtn").addEventListener("click",()=>{state.theme=state.theme==="light"?"dark":"light";localStorage.setItem("library-theme",state.theme);applyTheme()});$("profileRefreshBtn").addEventListener("click",loadFiles);$("chatGuideBtn").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));$("guideShortcut").addEventListener("click",()=>window.open(INSTRUCTION_URL,"_blank","noopener,noreferrer"));document.querySelectorAll("[data-study]").forEach(b=>b.addEventListener("click",()=>startStudy(b.dataset.study)));document.querySelectorAll(".nav-item[data-nav]").forEach(b=>b.addEventListener("click",()=>gotoSection(b.dataset.nav)));window.addEventListener("resize",()=>updateNavIndicator(document.documentElement.dataset.view||"home"),{passive:true});document.querySelectorAll(".filter").forEach(b=>b.addEventListener("click",()=>{state.filter=b.dataset.filter;document.querySelectorAll(".filter").forEach(x=>x.classList.toggle("active",x===b));renderFiles()}));$("search").addEventListener("input",e=>{state.query=e.target.value;renderFiles()});$("closeModal").addEventListener("click",closeModal);$("modalBackdrop").addEventListener("click",e=>{if(e.target===$("modalBackdrop"))closeModal()});document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeOfficePopup();$("welcomeBackdrop").classList.remove("show");closeSharePopup()}});$("nameForm").addEventListener("submit",e=>{e.preventDefault();const name=$("nameInput").value.trim();if(name){state.name=name;localStorage.setItem("library-name",name);toast("Lovely to have you here, "+name+".");}closeWelcome()});$("skipWelcome").addEventListener("click",closeWelcome);
 $("search").addEventListener("input",()=>{if((document.documentElement.dataset.view||"home")!=="library")gotoSection("library")});$("detailClose").addEventListener("click",closeSheet);$("detailCol").addEventListener("click",e=>{if(e.target===$("detailCol"))closeSheet()});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});if(sheetMQ.addEventListener)sheetMQ.addEventListener("change",closeSheet);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>updateNavIndicator(document.documentElement.dataset.view||"home"));
-document.addEventListener("contextmenu",event=>{if(!event.target.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);document.addEventListener("dragstart",event=>{if(!event.target.closest("input,textarea,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);applyTheme();if(state.name)$("nameInput").value=state.name;renderAccountPanel();refreshAuth();showInstallBanner();gotoSection("home");hideSplash();const pageParams=new URLSearchParams(window.location.search);if(pageParams.get("upload")==="1"){setTimeout(openUploadModal,1350)}else if(pageParams.get("share")==="1"){setTimeout(()=>openSharePopup(true),1350)}else{startPopupSequence()}renderPromptCards();loadFiles();document.addEventListener("visibilitychange",()=>{if(!document.hidden)loadFiles(true)});window.setInterval(()=>{if(!document.hidden)loadFiles(true)},60000);if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",event=>{if(event.data&&event.data.type==="LIBRARY_OPEN_SHARE")openSharePopup(true);else if(event.data&&event.data.type==="LIBRARY_OPEN_HOME")gotoSection("home")});window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Offline app shell unavailable",err)))}
+document.addEventListener("contextmenu",event=>{if(!event.target.closest("input,textarea,select,option,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);document.addEventListener("dragstart",event=>{if(!event.target.closest("input,textarea,[contenteditable='true'],[contenteditable='']"))event.preventDefault()},true);applyTheme();if(state.name)$("nameInput").value=state.name;renderAccountPanel();refreshAuth();showInstallBanner();gotoSection("home");hideSplash();const pageParams=new URLSearchParams(window.location.search);if(pageParams.get("upload")==="1"){setTimeout(openUploadModal,1350)}else if(pageParams.get("share")==="1"){setTimeout(()=>openSharePopup(true),1350)}else{startPopupSequence()}renderPromptCards();loadFiles();document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadFiles(true);startDiscoveryRotation()}else stopDiscoveryRotation()});window.setInterval(()=>{if(!document.hidden)loadFiles(true)},60000);if("serviceWorker" in navigator){navigator.serviceWorker.addEventListener("message",event=>{if(event.data&&event.data.type==="LIBRARY_OPEN_SHARE")openSharePopup(true);else if(event.data&&event.data.type==="LIBRARY_OPEN_HOME")gotoSection("home")});window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(err=>console.warn("Offline app shell unavailable",err)))}
 })();
 </script>
 </body>
