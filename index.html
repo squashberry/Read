@@ -1367,6 +1367,7 @@ async function handleEasyUpload(cfg){
  if(uploadQueue.some(item=>item.file.size<=0||item.file.size>8*1024*1024)){toast("Each file must be smaller than 8 MB.");return}
  const targetCollection=uploadTargetCollection;
  const category=String($("uploadCategory")&&$("uploadCategory").value||"").trim().slice(0,40)||String(targetCollection&&targetCollection.name||"Uncategorised");
+ if(targetCollection&&(targetCollection.files||[]).length+uploadQueue.length>80){toast("A collection can hold up to 80 documents. Remove a document before adding more.");return}
  if(!authState.token||!authState.user){closeModal();authState.afterAuthAction="upload";openAuthModal();return}
  if(uploadQueue.some(item=>item.review&&item.review.relevant===false)){toast("Remove files marked unrelated to study.");syncUploadButton();return}
  button.disabled=true;results.innerHTML="";
@@ -1401,7 +1402,7 @@ async function handleEasyUpload(cfg){
   let collectionUpdateError="";
   if(targetCollection){
    const merged=new Map(collectionFiles.map(item=>[String(item.path),item]));
-   uploaded.forEach(item=>{if(item&&item.path)merged.set(String(item.path),{id:item.id,path:item.path,name:item.name})});
+   uploaded.forEach(item=>{if(item&&item.path)merged.set(String(item.path),{id:String(item.id).padStart(3,"0"),path:item.path,name:item.name})});
    collectionFiles=Array.from(merged.values());
    try{
     await apiFetch("/auth/collections/"+encodeURIComponent(targetCollection.id),{method:"PATCH",body:JSON.stringify({name:targetCollection.name,description:targetCollection.description||"",isPublic:Boolean(targetCollection.isPublic),items:collectionFiles})});
