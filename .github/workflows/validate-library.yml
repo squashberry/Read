@@ -48,14 +48,14 @@ jobs:
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
-            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded',
+            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded', 'const BUILT_IN_COLLECTIONS=', 'function getBuiltInCollections()', 'function openBuiltInCollection(id)', 'data-built-in-collection', 'data-curated-book-path', 'Study every book in this collection',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'id="splashBoot"', 'href="./splash.js" as="script"', 'overflow-x:clip'
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v19')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v20')) throw new Error('Service worker cache version was not refreshed');
           if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const uploadBatchSource = fs.readFileSync('upload-worker/worker.js', 'utf8');
@@ -191,6 +191,12 @@ jobs:
           const missing = registry.items.filter(item => !item.id || !item.name || !item.path || item.kind !== 'study-material');
           if (missing.length) throw new Error('Catalogue entries are missing required study-material metadata');
           console.log('Catalogue OK: ' + registry.items.length + ' uniquely numbered learning files.');
+          const collectionCounts = Object.fromEntries(['Research', 'Med_Surg', 'Nutrition'].map(category => [category, registry.items.filter(item => item.category === category).length]));
+          for (const [category, expected] of Object.entries({ Research: 20, Med_Surg: 20, Nutrition: 13 })) {
+            if (collectionCounts[category] !== expected) throw new Error(category + ' collection should contain ' + expected + ' books; found ' + collectionCounts[category]);
+          }
+          console.log('Curated subject collections OK: ' + JSON.stringify(collectionCounts));
+
           const registeredPaths = new Set(registry.items.map(item => item.path));
           const sourceDocuments = fs.readdirSync('.').filter(name => /\\.(pdf|ppt|pptx|doc|docx|rtf)$/i.test(name));
           const unregisteredDocuments = sourceDocuments.filter(name => !registeredPaths.has(name));

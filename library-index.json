@@ -8,7 +8,8 @@
       "path": "ANGINA.pptx",
       "size": 52001,
       "kind": "study-material",
-      "transcriptPath": "study-text/001.md"
+      "transcriptPath": "study-text/001.md",
+      "category": "Med_Surg"
     },
     {
       "id": "002",
@@ -24,7 +25,8 @@
       "path": "CONGESTIVE HEART FAILURE (CHF).pptx",
       "size": 54257,
       "kind": "study-material",
-      "transcriptPath": "study-text/003.md"
+      "transcriptPath": "study-text/003.md",
+      "category": "Med_Surg"
     },
     {
       "id": "004",
@@ -32,7 +34,8 @@
       "path": "CORONARY ARTERY DISEASES.pptx",
       "size": 63217,
       "kind": "study-material",
-      "transcriptPath": "study-text/004.md"
+      "transcriptPath": "study-text/004.md",
+      "category": "Med_Surg"
     },
     {
       "id": "005",
@@ -56,7 +59,8 @@
       "path": "GASTROESOPHAGEAL REFLUX DISEASE(GERD).pptx",
       "size": 53147,
       "kind": "study-material",
-      "transcriptPath": "study-text/007.md"
+      "transcriptPath": "study-text/007.md",
+      "category": "Med_Surg"
     },
     {
       "id": "008",
@@ -112,7 +116,8 @@
       "path": "VALVULAR HEART DISEASE.pptx",
       "size": 52242,
       "kind": "study-material",
-      "transcriptPath": "study-text/014.md"
+      "transcriptPath": "study-text/014.md",
+      "category": "Med_Surg"
     },
     {
       "id": "015",
@@ -127,140 +132,160 @@
       "name": "INTRODUCTION TO RESEARCH.doc",
       "path": "INTRODUCTION TO RESEARCH.doc",
       "size": 54784,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "017",
       "name": "INTRODUCTION TO RESEARCH.pptx",
       "path": "INTRODUCTION TO RESEARCH.pptx",
       "size": 92999,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "018",
       "name": "LITERATURE REVIEW.pptx",
       "path": "LITERATURE REVIEW.pptx",
       "size": 69144,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "019",
       "name": "Non Probability Sampling Method.pptx",
       "path": "Non Probability Sampling Method.pptx",
       "size": 56286,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "020",
       "name": "Non-Probability Sampling Methods.pptx",
       "path": "Non-Probability Sampling Methods.pptx",
       "size": 63770,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "021",
       "name": "PROPOSAL WRITING.pptx",
       "path": "PROPOSAL WRITING.pptx",
       "size": 95820,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "022",
       "name": "QUAN.DATA ANALYSIS.pptx",
       "path": "QUAN.DATA ANALYSIS.pptx",
       "size": 229460,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "023",
       "name": "QUANTITATIVE SAMPLING TECHNIQUE 2.pptx",
       "path": "QUANTITATIVE SAMPLING TECHNIQUE 2.pptx",
       "size": 153474,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "024",
       "name": "QUANTITATIVE SAMPLING TECHNIQUE.pptx",
       "path": "QUANTITATIVE SAMPLING TECHNIQUE.pptx",
       "size": 153474,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "025",
       "name": "Qualitative analysis.pptx",
       "path": "Qualitative analysis.pptx",
       "size": 68203,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "026",
       "name": "Quantitive research  LECTURE 1.pptx",
       "path": "Quantitive research  LECTURE 1.pptx",
       "size": 118528,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "027",
       "name": "Quantitive research LECTURE 2.pptx",
       "path": "Quantitive research LECTURE 2.pptx",
       "size": 128862,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "028",
       "name": "Quantitive research LECTURE 3.pptx",
       "path": "Quantitive research LECTURE 3.pptx",
       "size": 81487,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "029",
       "name": "Questionnaire Designing.pptx",
       "path": "Questionnaire Designing.pptx",
       "size": 49827,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "030",
       "name": "RESEARCH OBJECTIVES AND QUESTIONS.pptx",
       "path": "RESEARCH OBJECTIVES AND QUESTIONS.pptx",
       "size": 161999,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "031",
       "name": "RESEARCH PROCESS 2.pptx",
       "path": "RESEARCH PROCESS 2.pptx",
       "size": 108639,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "032",
       "name": "RESEARCH PROCESS.pptx",
       "path": "RESEARCH PROCESS.pptx",
       "size": 108639,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "033",
       "name": "collection&managing data2.pptx",
       "path": "collection&managing data2.pptx",
       "size": 157893,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "034",
       "name": "qualitatie research design.pptx",
       "path": "qualitatie research design.pptx",
       "size": 70030,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "035",
       "name": "research methods.pptx",
       "path": "research methods.pptx",
       "size": 153645,
-      "kind": "study-material"
+      "kind": "study-material",
+      "category": "Research"
     },
     {
       "id": "036",
@@ -271,6 +296,222 @@
       "uploadedAt": "2026-11-18T11:05:40.263Z",
       "uploadedBy": "",
       "category": "Med_Surg"
+    },
+    {
+      "id": "037",
+      "name": "APPENDICITIS.pptx",
+      "path": "MED SURG/APPENDICITIS.pptx",
+      "size": 213099,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "038",
+      "name": "BRONCHIAL ASTHMA BY MR. CHUBA.pptx",
+      "path": "MED SURG/BRONCHIAL ASTHMA BY MR. CHUBA.pptx",
+      "size": 603305,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "039",
+      "name": "BRONCHITIS BY MR. CHUBA.pptx",
+      "path": "MED SURG/BRONCHITIS BY MR. CHUBA.pptx",
+      "size": 2994812,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "040",
+      "name": "Cholecystitis.pptx",
+      "path": "MED SURG/Cholecystitis.pptx",
+      "size": 120848,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "041",
+      "name": "HYPRERTENSION.pptx",
+      "path": "MED SURG/HYPRERTENSION.pptx",
+      "size": 79376,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "042",
+      "name": "INTRO TO HEMODIALYSIS.pptx",
+      "path": "MED SURG/INTRO TO HEMODIALYSIS.pptx",
+      "size": 254787,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "043",
+      "name": "Ileostomyy.pptx",
+      "path": "MED SURG/Ileostomyy.pptx",
+      "size": 5341725,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "044",
+      "name": "Liver cirrhosis 12.pptx",
+      "path": "MED SURG/Liver cirrhosis 12.pptx",
+      "size": 1776137,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "045",
+      "name": "PEPTIC ULCER - Copy.ppt",
+      "path": "MED SURG/PEPTIC ULCER - Copy.ppt",
+      "size": 705024,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "046",
+      "name": "PNEMONIA BY MR CHUBA.pptx",
+      "path": "MED SURG/PNEMONIA BY MR CHUBA.pptx",
+      "size": 255193,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "047",
+      "name": "PROSTATE DISORDERS.pptx",
+      "path": "MED SURG/PROSTATE DISORDERS.pptx",
+      "size": 63948,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "048",
+      "name": "RENAL FAILURE.pptx",
+      "path": "MED SURG/RENAL FAILURE.pptx",
+      "size": 223206,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "049",
+      "name": "URINARY TRACT INFECTIONS.pptx",
+      "path": "MED SURG/URINARY TRACT INFECTIONS.pptx",
+      "size": 72100,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "050",
+      "name": "hemothorax1.pptx",
+      "path": "MED SURG/hemothorax1.pptx",
+      "size": 1701780,
+      "kind": "study-material",
+      "category": "Med_Surg"
+    },
+    {
+      "id": "051",
+      "name": "LECTURE  8  FACTORS THAT INFLUENCE NUTRITIONAL STATUS (1).pptx",
+      "path": "NUTRITION/LECTURE  8  FACTORS THAT INFLUENCE NUTRITIONAL STATUS (1).pptx",
+      "size": 75882,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "052",
+      "name": "LECTURE 1 A INTRODUCTION TO NUTRITION AND DIETETICS.pptx",
+      "path": "NUTRITION/LECTURE 1 A INTRODUCTION TO NUTRITION AND DIETETICS.pptx",
+      "size": 767189,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "053",
+      "name": "LECTURE 12 Common nutrition related diseases  2.pptx",
+      "path": "NUTRITION/LECTURE 12 Common nutrition related diseases  2.pptx",
+      "size": 167208,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "054",
+      "name": "LECTURE 13 General Metabolism & Basal Metabolic Rate (BMR (1).pptx",
+      "path": "NUTRITION/LECTURE 13 General Metabolism & Basal Metabolic Rate (BMR (1).pptx",
+      "size": 757422,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "055",
+      "name": "LECTURE 17   From Farm to Fork.pptx",
+      "path": "NUTRITION/LECTURE 17   From Farm to Fork.pptx",
+      "size": 138771,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "056",
+      "name": "LECTURE 2 Digestion, Absorption, and Utilization of Nutrients WORD DOC.docx",
+      "path": "NUTRITION/LECTURE 2 Digestion, Absorption, and Utilization of Nutrients WORD DOC.docx",
+      "size": 32437,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "057",
+      "name": "LECTURE 3 LOCAL FOOD SUBSTANCES AND NUTRIENTS.pptx",
+      "path": "NUTRITION/LECTURE 3 LOCAL FOOD SUBSTANCES AND NUTRIENTS.pptx",
+      "size": 730595,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "058",
+      "name": "LECTURE 6 FACTORS AFFECTING AVAILABILITY OF FOODS.pptx",
+      "path": "NUTRITION/LECTURE 6 FACTORS AFFECTING AVAILABILITY OF FOODS.pptx",
+      "size": 741756,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "059",
+      "name": "LECTURE 7 Digestive System PPT.pptx",
+      "path": "NUTRITION/LECTURE 7 Digestive System PPT.pptx",
+      "size": 1734488,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "060",
+      "name": "LECTURE 7 Food policies and programmes.pptx",
+      "path": "NUTRITION/LECTURE 7 Food policies and programmes.pptx",
+      "size": 83475,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "061",
+      "name": "Lecture 2 DIGESTION ABSORPTION UTILIZATION.pptx",
+      "path": "NUTRITION/Lecture 2 DIGESTION ABSORPTION UTILIZATION.pptx",
+      "size": 1618411,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "062",
+      "name": "MACRONUTRIENTS.pptx",
+      "path": "NUTRITION/MACRONUTRIENTS.pptx",
+      "size": 354749,
+      "kind": "study-material",
+      "category": "Nutrition"
+    },
+    {
+      "id": "063",
+      "name": "PPT ON Dietary Management in Clinical Nursing 1.pptx",
+      "path": "NUTRITION/PPT ON Dietary Management in Clinical Nursing 1.pptx",
+      "size": 779715,
+      "kind": "study-material",
+      "category": "Nutrition"
     }
   ]
 }
