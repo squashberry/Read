@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#c8d6fc">
-<meta name="description" content="A simple guide for studying with Squashberry Library: choose a file, find a topic, or practise with ChatGPT.">
+<meta name="description" content="A simple guide to uploading study materials, organising collections and studying every file in a collection with ChatGPT.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://squashberry.github.io/Read/gptinstruction/">
 <meta property="og:type" content="article">
@@ -54,7 +54,7 @@ h1 span{color:var(--blue)}
 .prompt code{display:block;padding:18px;border-radius:18px;background:var(--dark2);color:#dfe3ff;font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;flex:1}
 .prompt button{min-height:50px;border-radius:999px;background:var(--blue);color:#fff;font-weight:800;font-size:14px;box-shadow:0 12px 26px rgba(63,111,232,.4)}
 .prompt button:hover{background:#4f7cf2}
-.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:34px}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:34px}
 .card{padding:24px;border-radius:26px;border:1px solid var(--line);background:var(--paper);transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .3s}
 .card:hover{transform:translateY(-4px);box-shadow:0 16px 44px rgba(72,96,170,.14)}
 .card:first-child{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 22px 44px rgba(63,111,232,.34)}
@@ -89,14 +89,15 @@ details[open] summary::after{content:"–"}
 <section class="hero">
 <div class="eyebrow">A friendly study guide</div>
 <h1>Let’s study using<br><span>SquashberryLibrary.</span></h1>
-<p class="intro">Think of this as your study partner. It can help you find the right notes, understand a difficult topic, prepare for exams and practise one question at a time.</p>
+<p class="intro">Think of this as your study partner. Upload your notes, group related files into collections such as Med-Surg, then ask ChatGPT to read the whole collection and help you study it together.</p>
 <div class="actions"><a class="btn primary" href="../?upload=1">Upload a study file ↗</a><a class="btn" href="../">Browse learning files</a></div>
-<div class="prompt"><p>Start a ChatGPT conversation with this simple message:</p><code id="starter">Let’s study using SquashberryLibrary. Read what https://squashberry.github.io/Read/gptinstruction/index.html says and let’s get started.</code><button id="copyStarter" type="button">Copy starter message</button></div>
+<div class="prompt"><p>Start a ChatGPT conversation with this simple message:</p><code id="starter">Let’s study using SquashberryLibrary. Follow the instructions at https://squashberry.github.io/Read/gptinstruction/index.html. When I give you a collection name and its file IDs, read every listed document together. Do not stop after the first file.</code><button id="copyStarter" type="button">Copy starter message</button></div>
 </section>
 <section class="cards" aria-label="Ways to begin">
 <article class="card"><span class="num">1</span><h2>Show me the files</h2><p>ChatGPT should show the available learning materials by number and name so you can choose one.</p></article>
 <article class="card"><span class="num">2</span><h2>Find a topic</h2><p>Tell ChatGPT what you’re studying. It should look for matching notes and ask which file to use.</p></article>
 <article class="card"><span class="num">3</span><h2>Study a file number</h2><p>If you already know the number, tell ChatGPT—for example, “Let’s study file 012.”</p></article>
+<article class="card"><span class="num">4</span><h2>Study a collection</h2><p>Open My collections, choose Study all, and ChatGPT will work through every file saved in that collection.</p></article>
 </section>
 <section class="guide">
 <h2>Useful Library features</h2>
@@ -104,6 +105,7 @@ details[open] summary::after{content:"–"}
 <div class="step"><span class="num">1</span><div><b>Search by file code</b><p>Open the Library tab and type the document code (for example, 012) into the search bar. You can also search by a title or topic.</p></div></div>
 <div class="step"><span class="num">2</span><div><b>Get daily study reminders</b><p>In the You tab, sign in and enable Daily study reminder. Allow browser notifications and choose your preferred local reminder time. The reminder can arrive even when Library is closed.</p></div></div>
 <div class="step"><span class="num">3</span><div><b>Share with a friend</b><p>Use the Share button on a notice or the share option in a reminder to send Library to a classmate.</p></div></div>
+<div class="step"><span class="num">4</span><div><b>Open My collections</b><p>Use the My collections button on the homepage to see your saved groups, add more files, edit a collection or study the whole collection with ChatGPT.</p></div></div>
 </div>
 </section>
 <section class="guide">
@@ -114,6 +116,14 @@ details[open] summary::after{content:"–"}
 <div class="step"><span class="num">C</span><div><b>“Would you like a simple explanation, a full lesson, revision notes, flashcards or exam practice?”</b><p>You can ask for a different way at any point. Exam practice should ask one question at a time.</p></div></div>
 </div>
 <p class="tip"><b>If a file can’t be found or opened:</b> ChatGPT should be honest, suggest a genuinely similar file if one exists, or ask a short clarifying question if the request is unclear. If the exact file is missing or its contents still cannot be accessed, it should guide you to <a href="https://squashberry.github.io/Read/?upload=1">upload or re-upload it to Squashberry Library</a>. To browse existing materials, visit the <a href="https://squashberry.github.io/Read/">Library website</a>. It must never pretend it has read a file it could not open.</p>
+</section>
+<section class="guide">
+<h2>Upload and organise your notes</h2>
+<div class="steps">
+<div class="step"><span class="num">1</span><div><b>Choose where the files belong</b><p>When you tap Upload, choose an existing collection, create a new collection (for example, Med-Surg), or upload the files as individual items.</p></div></div>
+<div class="step"><span class="num">2</span><div><b>Keep adding to the same collection</b><p>Choose an existing collection whenever you upload another set of related notes. The new files are added to the collection; the earlier files stay there.</p></div></div>
+<div class="step"><span class="num">3</span><div><b>Study all the files together</b><p>On the homepage, open My collections and select Study all. ChatGPT receives the collection name and every file ID, then reads the listed original documents and connects the topics across them.</p></div></div>
+</div>
 </section>
 <details>
 <summary>Instructions for ChatGPT (the website’s study rules)</summary>
@@ -126,6 +136,7 @@ details[open] summary::after{content:"–"}
 <li>To open the original document, build its raw URL from <code>https://raw.githubusercontent.com/squashberry/Read/master/</code> plus the entry's exact <code>path</code>, URL-encoding each path segment. <b>The original file is the primary source.</b> Actually retrieve and read it using the available tools. For PowerPoint files (<code>.pptx</code>), try to download the original and extract text from the presentation XML/slides, in slide order; do not assume a binary file cannot be read just because it is not rendered as a normal web page. For PDFs and other supported formats, use the relevant file-reading or extraction capability. Do not silently substitute a different file or claim to have read a source that you could not access.</li>
 <li>If the catalogue entry explicitly includes <code>transcriptPath</code>, open it as a <b>secondary text aid or fallback</b>, not an automatic replacement for the original. Prefer text actually extracted from the original file; use the transcript to fill gaps or cross-check extracted text, and preserve the original document's topic/slide order. If the transcript conflicts with the original, prioritize the original and note the discrepancy when it matters. Never assume a transcript exists or guess its path.</li>
 <li>For <b>Exam mode</b>, create a challenging exam based on the selected source. Ask one question at a time and wait for the learner's answer; do not give multiple-choice options or reveal the answer in advance unless asked. Mark the response, explain gaps, keep score, and include relevant clinical application. For <b>Lecture mode</b>, teach the material in a complete, structured, step-by-step lesson. For <b>Read mode</b>, explain the material clearly and accurately. For <b>Flashcards mode</b>, produce active-recall questions and concise answers. For <b>Summary mode</b>, make useful, source-based revision notes. For <b>Study files … together</b>, use all the exact listed IDs and help the learner connect their topics.</li>
+<li>For <b>collection study mode</b>, recognise a request containing <code>COLLECTION MODE — READ THE WHOLE COLLECTION</code>, a collection name, and a list of exact Library file IDs. This means the learner wants the <b>entire saved collection</b>, not a single document. Do not ask which file to choose. Use the live catalogue to match every listed ID, retrieve and read each original source one by one, and keep the collection’s file order. After covering each source, connect shared themes, compare differences, explain how the documents support or extend one another, and identify gaps. Do not add unrelated catalogue files. If an ID is missing or a source cannot be opened, name that exact ID, be clear about the limitation, and continue with the other accessible files; never claim the whole collection was read if some files were not accessible.</li>
 <li>Do not ask the learner to attach a Library file to the chat if its public GitHub source URL is accessible. Before saying you cannot read a file, attempt to retrieve the actual original URL and extract its contents with the available tools. For a PowerPoint, inspect the original <code>.pptx</code> contents (including its slide XML text) when possible; do not rely on the registered transcript alone just because it is easier. If one tool cannot parse the file, try a reasonable alternate retrieval or extraction path before declaring it unreadable. Be honest about any remaining limitations, including visuals you could not inspect.</li>
 <li>If the requested ID is missing or the original document genuinely cannot be accessed after reasonable retrieval/extraction attempts, say exactly what failed. When useful, recommend one or two genuinely similar catalogue files and clearly label them as alternatives. Ask a short clarifying question only if the intended file/topic is ambiguous.</li>
 <li>If the exact file is missing or remains unreadable after those attempts, direct the learner to <a href="https://squashberry.github.io/Read/?upload=1">upload or re-upload the file to Squashberry Library</a>. If they only need to check available files, send them to <a href="https://squashberry.github.io/Read/">the Library website</a>. Explain the most appropriate next step and do not ask them to upload the file into chat when the Library source is accessible. A Library upload may require signing in with email and a one-time code; no GitHub account is needed.</li>
