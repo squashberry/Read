@@ -539,16 +539,16 @@ html.splash-lock,body.splash-lock{overflow:hidden!important}
 <script>
 (function(){
 "use strict";
-var boot=document.getElementById("splashBoot"),attempt=0,timer=0,loading=false;
+var boot=document.getElementById("splashBoot"),attempt=0,timer=0,loading=false,loaded=false;
 if(document.documentElement)document.documentElement.classList.add("splash-lock");
 if(document.body)document.body.classList.add("splash-lock");
 function loadSplash(){
- if(loading)return;
+ if(loading||loaded)return;
  loading=true;
  var script=document.createElement("script");
  script.src="./splash.js";
  script.async=true;
- script.onload=function(){loading=false};
+ script.onload=function(){loading=false;loaded=true};
  script.onerror=function(){
   loading=false;script.remove();attempt++;
   var status=boot&&boot.querySelector("[data-splash-status]");
