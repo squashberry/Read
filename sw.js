@@ -1,4 +1,4 @@
-const CACHE_NAME = "squashberry-library-shell-v18";
+const CACHE_NAME = "squashberry-library-shell-v19";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./og-image.svg", "./upload-config.js", "./splash.js", "./gptinstruction/"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

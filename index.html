@@ -1069,6 +1069,7 @@ function showPublicCollectionStudyPicker(mode){
  });
 }
 function openCollectionShelf(){
+ closeModal();
  state.filter="collections";
  document.querySelectorAll(".library-tools .filter").forEach(button=>button.classList.toggle("active",button.dataset.filter==="collections"));
  gotoSection("library");
