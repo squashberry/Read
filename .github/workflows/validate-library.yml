@@ -44,7 +44,7 @@ jobs:
             'id="shareNowBtn"', 'id="uploadCta"', 'id="installAppBtn"', 'id="homeMore"',
             'id="installBanner"', 'id="accountPanel"', 'function openAuthModal()',
             'sb("signup","POST",{email,password,data:{display_name:name}})', 'sb("token?grant_type=password","POST",{email,password},"")', 'xhr.open("POST",apiBase()+"/upload")', 'fetch(apiBase()+"/upload/review"', 'id="uploadFilePreview"', 'function extractStudyText(file)', 'uploadReviewDone', 'buildUploadedFilesPrompt', 'Use in ChatGPT', 'Confirm title & upload', 'Need help? Open the Library guide',
-            'INSTRUCTION_URL="https://squashberry.github.io/Read/gptinstruction/index.html"',
+            'INSTRUCTION_URL="https://read-674.pages.dev/gptinstruction/index.html"',
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
@@ -55,11 +55,14 @@ jobs:
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v15')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v16')) throw new Error('Service worker cache version was not refreshed');
           if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const uploadBatchSource = fs.readFileSync('upload-worker/worker.js', 'utf8');
           if (!uploadBatchSource.includes('MAX_FILES_PER_REQUEST = 24')) throw new Error('Upload Worker must accept batches of up to 24 files');
+          if (!uploadBatchSource.includes('ALLOWED_ORIGIN = "https://read-674.pages.dev"')) throw new Error('Upload Worker CORS must allow the new Library domain');
+          if (!html.includes('library-moved') || !html.includes('Go to the new Library') || !html.includes('https://read-674.pages.dev/')) throw new Error('The old GitHub Pages URL must show the new-site notice');
+          if (!html.includes('80 MB total') || !html.includes('80*1024*1024') || !uploadBatchSource.includes('MAX_REQUEST_BYTES = 80 * 1024 * 1024')) throw new Error('The uploader must enforce the total 80 MB batch limit');
           if (!html.includes('up to 24') || !html.includes('uploadQueue.length>24')) throw new Error('Uploader UI must enforce the 24-file batch limit');
           if (!html.includes('openUploadTitleConfirmation(cfg)') || !html.includes('Yes, continue') || !html.includes('cancelUploadTitleConfirm')) throw new Error('Missing editable title confirmation popup');
           if (!html.includes('80 MB total') || !html.includes('80*1024*1024') || !uploadBatchSource.includes('MAX_REQUEST_BYTES = 80 * 1024 * 1024')) throw new Error('Uploader must enforce a safe 80 MB total batch size');
@@ -164,9 +167,11 @@ jobs:
             if (!schema.includes('CREATE TABLE IF NOT EXISTS ' + table)) throw new Error('D1 schema is missing the ' + table + ' table');
           }
           const sitemap = fs.readFileSync('sitemap.xml', 'utf8');
-          if (!sitemap.includes('https://squashberry.github.io/Read/') || !sitemap.includes('https://squashberry.github.io/Read/gptinstruction/')) {
-            throw new Error('Sitemap is missing one or more public app pages');
+          if (!sitemap.includes('https://read-674.pages.dev/') || !sitemap.includes('https://read-674.pages.dev/gptinstruction/')) {
+            throw new Error('Sitemap is missing one or more public app pages on the new domain');
           }
+          const robots = fs.readFileSync('robots.txt', 'utf8');
+          if (!robots.includes('https://read-674.pages.dev/sitemap.xml')) throw new Error('Robots.txt must reference the new Library sitemap');
           const uploadSectionStart = html.indexOf('let uploadQueue=[];');
           const uploadSectionEnd = html.indexOf('const SHARE_URL=', uploadSectionStart);
           if (uploadSectionStart < 0 || uploadSectionEnd < 0 || /turnstile|captcha/i.test(html.slice(uploadSectionStart, uploadSectionEnd))) {
