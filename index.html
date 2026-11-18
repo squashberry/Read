@@ -491,10 +491,6 @@ body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
 (function(){
 "use strict";
 var d=document,q=location.search,nv=navigator;
-if(/[?&]intro=0(&|$)/.test(q))return;
-var force=/[?&]intro=1(&|$)/.test(q);
-if(!force&&/[?&](upload|share)=1(&|$)/.test(q))return;
-try{if(!force&&sessionStorage.getItem("sq-intro")==="1")return;sessionStorage.setItem("sq-intro","1")}catch(e){}
 var RM=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
 css3=!!(window.CSS&&CSS.supports&&CSS.supports("transform-style","preserve-3d")),
 lite=!!((nv.deviceMemory&&nv.deviceMemory<=2)||(nv.hardwareConcurrency&&nv.hardwareConcurrency<=2)||(nv.connection&&nv.connection.saveData))||/[?&]lite=1/.test(q),
