@@ -462,7 +462,6 @@ body:not(.light) .splash{background:#0c0e1f;color:#f1f3ff}
 (function(){
 "use strict";
 var d=document,q=location.search,nv=navigator;
-if(/[?&]intro=0(&|$)/.test(q))return;
 var RM=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
 css3=!!(window.CSS&&CSS.supports&&CSS.supports("transform-style","preserve-3d")),
 lite=!!((nv.deviceMemory&&nv.deviceMemory<=2)||(nv.hardwareConcurrency&&nv.hardwareConcurrency<=2)||(nv.connection&&nv.connection.saveData))||/[?&]lite=1/.test(q),
@@ -1340,7 +1339,7 @@ function openEasyUploadModal(cfg,targetCollection=null){
  $("modalDescription").textContent=targetCollection?"New uploads will be added to this collection so you can study all its documents together.":"Choose files. We’ll title them and add them to Library.";
  $("modalBody").innerHTML='<div class="upload-form"><div><label for="uploadFiles">Study files (up to four, 8 MB each)</label><input id="uploadFiles" type="file" accept=".pdf,.ppt,.pptx,.doc,.docx,.txt,.md,.rtf" multiple required></div><div style="margin-top:14px"><label for="uploadCategory">Collection name (optional)</label><input id="uploadCategory" maxlength="40" value="'+esc(targetCollection&&targetCollection.name||"")+'" placeholder="e.g. Research, Nursing, Anatomy"></div>'+(targetCollection?'<p class="upload-help">These uploads will also be linked to <strong>'+esc(targetCollection.name)+'</strong>. Use “Study” to read the whole collection.</p>':"")+'<div id="uploadFilePreview" class="upload-file-preview" aria-live="polite"><div class="upload-empty">Choose study files.</div></div><label class="upload-ack"><input type="checkbox" id="publicAck"><span>Files can be seen and downloaded by anyone.</span></label><label class="upload-ack upload-study-ack"><input type="checkbox" id="studyAck"><span>These are genuine study materials.</span></label><p class="upload-help"><a href="'+esc(INSTRUCTION_URL)+'" target="_blank" rel="noopener noreferrer">Need help? Open the Library guide ↗</a></p><div id="uploadProcessing" class="upload-processing" hidden><span class="upload-spinner" aria-hidden="true"></span><div class="upload-processing-copy"><strong id="uploadProcessingTitle">Preparing files…</strong><p id="uploadProcessingDetail">Please wait.</p><div class="upload-progress-track"><div id="uploadProgressBar" class="upload-progress-bar"></div></div></div></div><div id="uploadProgress" class="upload-help" aria-live="polite"></div><div id="uploadResults" class="upload-results"></div><div class="modal-actions"><button class="primary-btn" id="uploadSubmit">Upload to Library ↥</button><button class="outline-btn" id="cancelUpload" type="button">Cancel</button></div></div>';
  $("modalBackdrop").classList.add("show");
- $("cancelUpload").onclick=closeModal;
+ $("cancelUpload").onclick=()=>{uploadTargetCollection=null;closeModal()};
  $("uploadFiles").addEventListener("change",event=>{
   uploadQueue=Array.from(event.target.files||[]).map(file=>({file,title:uploadDefaultTitle(file),text:undefined,fileHash:"",review:null,reviewToken:"",reviewError:"",aiFailed:false,titleConfirmed:false}));
   uploadReviewDone=false;uploadDone=false;$("uploadResults").innerHTML="";
