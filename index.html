@@ -594,6 +594,97 @@ html.library-moved #legacyMoveNotice{display:flex!important;align-items:center;j
 </div>
 
 
+<!-- Squashberry book loader: animated book for every loading and uploading state. -->
+<script id="squashberry-loader">
+(function(){
+"use strict";
+if(window.SqLoader)return;
+var d=document;
+var C={cv:"#3f6fe8",cd:"#2c58cf",cs:"#1f3fa0",pg:"#fbf6ea",pe:"#e4d9bf",ln:"#cdc3a8",lf:"#ffffff",ll:"#9eaadb",rb:"#ff6b57",gd:"#f0cf86"};
+function kf(n,fr){var s="@keyframes "+n+"{";fr.forEach(function(f){s+=f[0]+"%{"+f[1]+"}"});return s+"}"}
+function tf(x){return"transform:"+x}
+/* leaflet (upload) and page (load) keyframes for a window a..b (percent) */
+function sheetKF(n,a,b,end){
+ var m=(a+b)/2,s="translate(24px,4px) rotate(26deg) scale(.85)",e="transform:translate(0,0) rotate(0) scale(1)";
+ return kf(n,[[0,"opacity:0;"+tf(s)],[a-2,"opacity:0;"+tf(s)],[a,"opacity:1;"+tf(s)+";animation-timing-function:cubic-bezier(.2,.75,.4,1)"],
+ [m,"opacity:1;"+tf("translate(13px,-22px) rotate(10deg) scale(1)")+";animation-timing-function:cubic-bezier(.6,0,.9,.35)"],
+ [b,"opacity:1;"+tf("translate(0,0) rotate(0) scale(1.06)")],[b+3,"opacity:1;"+e],[end,"opacity:1;"+e],[end+1,"opacity:0;"+e],[100,"opacity:0;"+e]])}
+function pageKF(n,a,b){
+ var m=(a+b)/2;
+ return kf(n,[[0,"opacity:0;"+tf("scaleX(1)")],[a-.1,"opacity:0;"+tf("scaleX(1)")],[a,"opacity:1;"+tf("scaleX(1) skewY(0)")],
+ [m,"opacity:1;"+tf("scaleX(.02) translateY(-2px) skewY(-6deg)")],[b,"opacity:1;"+tf("scaleX(-1) skewY(0)")],[b+1.5,"opacity:0;"+tf("scaleX(-1)")],[100,"opacity:0;"+tf("scaleX(-1)")]])}
+function book(up){
+ var T=up?3.8:3,k="",A="animation:%n "+T+"s infinite ease-in-out;";
+ var CL="translateX(-17px)",O="translateX(0)";
+ if(up){
+  k+=kf("all",[[0,tf(CL)],[4,tf(CL)],[16,tf(O)],[66,tf(O)],[80,tf(CL)],[100,tf(CL)]]);
+  k+=kf("cf",[[0,tf("scaleX(1)")],[4,tf("scaleX(1)")],[10,tf("scaleX(0)")],[72,tf("scaleX(0)")],[78,tf("scaleX(1)")],[100,tf("scaleX(1)")]]);
+  k+=kf("cb",[[0,tf("scaleX(0)")],[10,tf("scaleX(0)")],[16,tf("scaleX(1)")],[66,tf("scaleX(1)")],[72,tf("scaleX(0)")],[100,tf("scaleX(0)")]]);
+  k+=kf("sq",[[0,tf("scale(1)")],[78,tf("scale(1)")],[83,tf("scale(1.05,.92)")],[88,tf("scale(.98,1.03)")],[94,tf("scale(1)")],[100,tf("scale(1)")]]);
+  k+=sheetKF("s1",20,32,78)+sheetKF("s2",34,46,78)+sheetKF("s3",48,60,78);
+ }else{
+  k+=kf("all",[[0,tf(CL)],[6,tf(CL)],[20,tf(O)],[70,tf(O)],[84,tf(CL)],[100,tf(CL)]]);
+  k+=kf("cf",[[0,tf("scaleX(1)")],[6,tf("scaleX(1)")],[13,tf("scaleX(0)")],[77,tf("scaleX(0)")],[84,tf("scaleX(1)")],[100,tf("scaleX(1)")]]);
+  k+=kf("cb",[[0,tf("scaleX(0)")],[13,tf("scaleX(0)")],[20,tf("scaleX(1)")],[70,tf("scaleX(1)")],[77,tf("scaleX(0)")],[100,tf("scaleX(0)")]]);
+  k+=kf("sq",[[0,tf("scale(1)")],[84,tf("scale(1)")],[88,tf("scale(1.05,.92)")],[93,tf("scale(.98,1.03)")],[100,tf("scale(1)")]]);
+  k+=pageKF("s1",24,36)+pageKF("s2",36,48)+pageKF("s3",48,60);
+ }
+ var css="<style>"+k+
+ ".a{"+A.replace("%n","all")+"transform-origin:40px 32px}.cf{"+A.replace("%n","cf")+"transform-origin:40px 32px}.cb{"+A.replace("%n","cb")+"transform-origin:40px 32px}.sq{"+A.replace("%n","sq")+"transform-origin:40px 54px}"+
+ ".s1{"+A.replace("%n","s1")+"}.s2{"+A.replace("%n","s2")+"}.s3{"+A.replace("%n","s3")+"}"+
+ (up?".s1,.s2,.s3{transform-origin:7px 9px}":".s1,.s2,.s3{transform-origin:40px 32px}")+
+ ".s1,.s2,.s3{opacity:0}"+
+ "@media (prefers-reduced-motion:reduce){*{animation:none!important}.s1,.s2,.s3{opacity:0!important}.cf{transform:scaleX(0)}.cb{transform:scaleX(1)}.a{transform:none}}"+
+ "</style>";
+ var ln=function(x,y,w){return'<path d="M'+x+' '+y+'h'+w+'" stroke="'+C.ln+'" stroke-width=".9"/>'};
+ var lines=function(x){return ln(x,19,22)+ln(x,23,26)+ln(x,27,24)+ln(x,31,26)+ln(x,35,20)+ln(x,39,25)+ln(x,43,22)};
+ var sheet=function(n,x,y){return'<g transform="translate('+x+' '+y+')"><g class="'+n+'"><rect width="14" height="18" rx="1.2" fill="'+C.lf+'" stroke="'+C.ll+'" stroke-width=".7"/><path d="M3 5h8M3 8.5h8M3 12h5" stroke="'+C.ll+'" stroke-width=".9"/></g></g>'};
+ var pgs=function(n){return'<g class="'+n+'"><rect x="40" y="14.5" width="30.5" height="37" rx="1" fill="'+C.pg+'" stroke="'+C.pe+'" stroke-width=".6"/>'+lines(44)+'</g>'};
+ var body=
+ '<ellipse cx="40" cy="58" rx="29" ry="3" fill="#14226a" opacity=".18"/>'+
+ '<g class="sq"><g class="a">'+
+ '<rect x="40" y="11" width="34" height="43" rx="2" fill="'+C.cd+'" stroke="#fff" stroke-opacity=".45" stroke-width=".8"/>'+
+ '<rect x="40" y="14.5" width="31" height="37" rx="1" fill="'+C.pg+'"/><rect x="71" y="15.5" width="1.8" height="35" fill="'+C.pe+'"/>'+lines(44)+
+ '<rect x="57" y="50" width="2.8" height="10" fill="'+C.rb+'"/>'+
+ '<g class="cb"><rect x="6" y="11" width="34" height="43" rx="2" fill="'+C.cd+'" stroke="#fff" stroke-opacity=".45" stroke-width=".8"/><rect x="8.5" y="14.5" width="31.5" height="37" rx="1" fill="'+C.pg+'"/><rect x="7.5" y="15.5" width="1.8" height="35" fill="'+C.pe+'"/>'+lines(13)+'</g>'+
+ (up?sheet("s1",48,21)+sheet("s2",50,23)+sheet("s3",52,25):pgs("s1")+pgs("s2")+pgs("s3"))+
+ '<rect x="39.2" y="11" width="1.6" height="43" fill="'+C.cs+'"/>'+
+ '<g class="cf"><rect x="40" y="11" width="34" height="43" rx="2" fill="'+C.cv+'" stroke="#fff" stroke-opacity=".5" stroke-width=".9"/><rect x="40" y="11" width="4" height="43" fill="'+C.cd+'"/>'+
+ '<rect x="47" y="16.5" width="23" height="32" rx="1.5" fill="none" stroke="'+C.gd+'" stroke-width=".8"/><path d="M52 30c3.4-1.7 5.8-.7 7.5.9 1.7-1.6 4.1-2.6 7.5-.9v8c-3.4-1.7-5.8-.7-7.5.9-1.7-1.6-4.1-2.6-7.5-.9z M59.5 31v8" fill="none" stroke="'+C.gd+'" stroke-width=".9" stroke-linejoin="round"/></g>'+
+ '</g></g>';
+ return'<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 -10 92 74">'+css+body+'</svg>'}
+function url(up){return'url("data:image/svg+xml,'+encodeURIComponent(book(up))+'")'}
+var STYLE=":root{--sqk-l:"+url(false)+";--sqk-u:"+url(true)+"}"+
+".sqk{display:inline-block;flex:none;width:56px;height:45px;vertical-align:middle;background:var(--sqk-l) center/contain no-repeat}.sqk.up{background-image:var(--sqk-u)}"+
+".upload-processing .upload-spinner{width:68px;height:54px;margin:-6px -2px;border:0;border-radius:0;animation:none;background:var(--sqk-u) center/contain no-repeat}"+
+"#splashBoot .splash-boot-mark{width:92px;height:74px;margin-bottom:6px;border-radius:0;background:var(--sqk-l) center/contain no-repeat;box-shadow:none}#splashBoot .splash-boot-mark span{display:none}"+
+"button.sq-busy::before,.sq-in::before{content:'';display:inline-block;width:25px;height:20px;margin:-4px 7px -4px 0;vertical-align:middle;background:var(--sqk-l) center/contain no-repeat}"+
+".sq-ld::before{content:'';display:block;width:62px;height:50px;margin:0 auto 8px;background:var(--sqk-l) center/contain no-repeat}"+
+".sqp{position:fixed;z-index:130;left:50%;top:max(12px,env(safe-area-inset-top));display:flex;align-items:center;gap:6px;padding:5px 16px 5px 8px;border-radius:999px;background:var(--dark,#14162b);color:#fff;font:600 12.5px/1 var(--font,system-ui,sans-serif);box-shadow:0 12px 32px rgba(10,14,40,.35);transform:translate(-50%,-140%);opacity:0;visibility:hidden;pointer-events:none;transition:transform .45s cubic-bezier(.16,1,.3,1),opacity .3s,visibility .3s}"+
+".sqp.on{transform:translate(-50%,0);opacity:1;visibility:visible}.sqp .sqk{width:40px;height:32px}";
+var sty=d.createElement("style");sty.id="sq-loader-css";sty.textContent=STYLE;d.head.appendChild(sty);
+/* busy buttons: any button that is disabled and says "Something…" */
+function busy(b){return b.disabled&&/…\s*$/.test((b.textContent||"").trim())}
+function chk(b){b.classList.toggle("sq-busy",busy(b))}
+function scan(n){if(n&&n.nodeType===1&&n.tagName==="BUTTON")chk(n)}
+try{new MutationObserver(function(ms){ms.forEach(function(m){var t=m.target;scan(t);if(t.tagName==="BUTTON")setTimeout(function(){chk(t)},300)})}).observe(d.documentElement,{attributes:true,attributeFilter:["disabled"],subtree:true})}catch(e){}
+/* loading placeholders and the library status line */
+function mark(){
+ [].forEach.call(d.querySelectorAll(".account-empty,.empty-state"),function(e){if(/^\s*(Loading|Just opening|Opening)/i.test(e.textContent))e.classList.add("sq-ld")});
+ var s=d.getElementById("libraryStatus");
+ if(s){var f=function(){s.classList.toggle("sq-in",/…\s*$/.test(s.textContent||""))};f();try{new MutationObserver(f).observe(s,{childList:true,characterData:true,subtree:true})}catch(e){}}}
+if(d.readyState==="loading")d.addEventListener("DOMContentLoaded",mark);else mark();
+/* floating pill for any slow request */
+var pend=0,tm=0,pill=null;
+function blocked(){return d.hidden||d.querySelector(".sqi,#splashBoot:not(.is-leaving),.upload-processing:not([hidden])")}
+function inc(){pend++;if(pend===1)tm=setTimeout(function(){if(pend>0&&!blocked()){if(!pill){pill=d.createElement("div");pill.className="sqp";pill.setAttribute("role","status");pill.innerHTML='<span class="sqk" aria-hidden="true"></span>Loading…';d.body.appendChild(pill)}void pill.offsetWidth;pill.classList.add("on")}},900)}
+function dec(){pend=Math.max(0,pend-1);if(!pend){clearTimeout(tm);if(pill)pill.classList.remove("on")}}
+var of=window.fetch;
+if(of)window.fetch=function(i){var u="";try{u=String(i&&i.url||i)}catch(e){}var p=of.apply(this,arguments);
+ if(/^(\.|\/(?!\/))/.test(u)||u.indexOf(location.origin)===0||/workers\.dev|supabase\.co|raw\.githubusercontent\.com|api\.github\.com/.test(u)){inc();try{p.then(dec,dec)}catch(e){dec()}}return p};
+window.SqLoader={book:book,url:url};
+})();
+</script>
 <!-- Squashberry cinematic book intro: the single splash shown on every page load. -->
 <div id="splashBoot" role="status" aria-live="polite" aria-label="Loading Squashberry Library">
   <div class="splash-boot-mark" aria-hidden="true"><span></span><span></span></div>
