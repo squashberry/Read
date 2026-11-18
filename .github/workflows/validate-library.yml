@@ -47,11 +47,12 @@ jobs:
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
             'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
-            'id="squashberry-intro"', 'overflow-x:clip', 'shell-v11'
+            'id="squashberry-intro"', 'overflow-x:clip'
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v11')) throw new Error('Service worker cache version was not refreshed');
           if (html.includes('id="splash"') || html.includes('class="splash-byline"')) throw new Error('Legacy static splash must be removed; use the cinematic intro only');
           if (html.includes('Start by asking me whether I want to see all available files, find a topic, or study a specific file number.')) {
             throw new Error('The home ChatGPT launcher must not append the forced three-choice opener');
