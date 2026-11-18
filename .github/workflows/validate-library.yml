@@ -47,12 +47,18 @@ jobs:
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
             'async function toggleDailyReminders()', 'vapidPublicKey',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
-            'id="squashberry-intro"', 'overflow-x:clip'
+            'id="splashBoot"', 'href="./splash.js" as="script"', 'overflow-x:clip'
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v12')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v13')) throw new Error('Service worker cache version was not refreshed');
+if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
+if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
+const splash = fs.readFileSync('splash.js', 'utf8');
+new Function(splash);
+if (splash.includes('end(true)') || splash.includes('onKey')) throw new Error('The splash script still contains a user or automatic skip path');
+console.log('Splash download, full-playback and no-skip checks: OK');
           if (html.includes('id="splash"') || html.includes('class="splash-byline"')) throw new Error('Legacy static splash must be removed; use the cinematic intro only');
           if (html.includes('Start by asking me whether I want to see all available files, find a topic, or study a specific file number.')) {
             throw new Error('The home ChatGPT launcher must not append the forced three-choice opener');
@@ -103,7 +109,7 @@ jobs:
           if (manifest.display !== 'standalone' || manifest.scope !== './') {
             throw new Error('PWA manifest must use standalone display and repository-relative scope');
           }
-          for (const file of ['sw.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/schema.sql', 'upload-worker/README.md', 'robots.txt', 'sitemap.xml', '.nojekyll']) {
+          for (const file of ['sw.js', 'splash.js', 'icon.svg', 'og-image.svg', 'upload-config.js', 'upload-worker/worker.js', 'upload-worker/schema.sql', 'upload-worker/README.md', 'robots.txt', 'sitemap.xml', '.nojekyll']) {
             if (!fs.existsSync(file)) throw new Error('Missing app asset: ' + file);
           }
           const worker = fs.readFileSync('upload-worker/worker.js', 'utf8');
