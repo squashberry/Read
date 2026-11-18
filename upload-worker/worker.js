@@ -3,9 +3,10 @@ const REPO = "Read";
 const BRANCH = "master";
 const ALLOWED_ORIGIN = "https://squashberry.github.io";
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_REQUEST_BYTES = 80 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 24;
-const DAILY_IP_FILE_LIMIT = 100;
-const DAILY_USER_FILE_LIMIT = 100;
+const DAILY_IP_FILE_LIMIT = 24;
+const DAILY_USER_FILE_LIMIT = 24;
 const ALLOWED_EXTENSIONS = new Set(["pdf","ppt","pptx","doc","docx","txt","md","rtf"]);
 
 function response(data, status = 200) {
@@ -546,9 +547,14 @@ async function handleUpload(request, env) {
   if (!uploads.length || uploads.length > MAX_FILES_PER_REQUEST) {
     return response({error:"Choose between one and "+MAX_FILES_PER_REQUEST+" study files at a time."},400);
   }
+  let totalUploadBytes = 0;
   for (const file of uploads) {
     if (!ALLOWED_EXTENSIONS.has(extension(file.name))) return response({error:"Unsupported file type: "+safeName(file.name)},400);
     if (file.size <= 0 || file.size > MAX_FILE_BYTES) return response({error:"Each file must be smaller than 8 MB: "+safeName(file.name)},413);
+    totalUploadBytes += file.size;
+  }
+  if (totalUploadBytes > MAX_REQUEST_BYTES) {
+    return response({error:"The selected files exceed the 80 MB total upload limit. Remove a few files or split this batch into smaller uploads."},413);
   }
   let reviewTokens, transcripts;
   try {
