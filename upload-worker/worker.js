@@ -136,9 +136,11 @@ async function handleUploadReview(request, env) {
   const requestedManual = body.manual === true;
   const hasReadableText = extractedText.trim().length >= 30;
   let pdfBytes = null;
-  const titleConfirmationFallback = async () => response(await makeReviewResult(
+  const titleConfirmationFallback = async (diagnostic="") => response(await makeReviewResult(
     user,sourceName,fileHash,extractedText,cleanLibraryTitle(body.title,sourceName),
-    true,true,"Squashberry couldn't generate a file title. Confirm this title below.",env
+    true,true,diagnostic
+      ? "AI review unavailable: "+cleanText(diagnostic,150)+". Confirm the title below."
+      : "Squashberry couldn't generate a file title. Confirm this title below.",env
   ));
   if (!hasReadableText && !requestedManual && extension(sourceName) === "pdf" && typeof body.pdfBase64 === "string") {
     const encoded = body.pdfBase64.replace(/\s/g, "");
@@ -183,8 +185,7 @@ async function handleUploadReview(request, env) {
         body:JSON.stringify({
           contents:[{role:"user",parts}],
           generationConfig:{
-            temperature:0.1,
-            maxOutputTokens:8192,
+            maxOutputTokens:16384,
             responseMimeType:"application/json",
             responseSchema:{
               type:"OBJECT",
@@ -201,14 +202,15 @@ async function handleUploadReview(request, env) {
         })
       });
     } catch (networkError) {
-      console.warn("Gemini upload review request failed:",cleanText(networkError && networkError.message,160));
-      return titleConfirmationFallback();
+      const diagnostic=cleanText(networkError && networkError.message,120)||"network request failed";
+      console.warn("Gemini upload review request failed:",diagnostic);
+      return titleConfirmationFallback("connection failed: "+diagnostic);
     }
     if (!aiResponse.ok) {
       const apiError = await aiResponse.json().catch(() => ({}));
       const details = cleanText(apiError && apiError.error && apiError.error.message,160);
       console.warn("Gemini upload review returned status", aiResponse.status, details);
-      return titleConfirmationFallback();
+      return titleConfirmationFallback("Gemini HTTP "+aiResponse.status+(details?": "+details:""));
     }
     const aiBody = await aiResponse.json().catch(() => ({}));
     const aiText = (aiBody.candidates && aiBody.candidates[0] && aiBody.candidates[0].content &&
@@ -217,11 +219,11 @@ async function handleUploadReview(request, env) {
     try { analysis = JSON.parse(aiText); }
     catch {
       console.warn("Gemini upload review returned invalid structured data:",cleanText(aiText,160));
-      return titleConfirmationFallback();
+      return titleConfirmationFallback("Gemini returned an invalid structured response");
     }
     if (typeof analysis.title !== "string" || !analysis.title.trim()) {
       console.warn("Gemini upload review did not provide a title.");
-      return titleConfirmationFallback();
+      return titleConfirmationFallback("Gemini response did not contain a title");
     }
     const relevant = analysis.relevant === true;
     const title = cleanLibraryTitle(analysis.title, sourceName);
