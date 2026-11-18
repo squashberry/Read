@@ -1237,10 +1237,17 @@ async function toggleDailyReminders(){const button=$("toggleDailyPushBtn"),statu
 async function savePushReminderTime(){if(!state.pushEnabled)return;const select=$("pushReminderTime");if(!select)return;try{const reg=await currentServiceWorkerRegistration();const subscription=await reg.pushManager.getSubscription();if(!subscription)return;const timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Banjul";const result=await apiFetch("/push/subscribe",{method:"POST",body:JSON.stringify({subscription:subscription.toJSON(),reminderTime:select.value,timeZone})});state.pushTime=result.reminderTime||select.value;const status=$("pushReminderStatus");if(status)status.textContent="Enabled · reminders arrive at "+state.pushTime+" in "+timeZone+".";toast("Your daily reminder time has been updated.");}catch(error){toast("Could not update reminder time: "+error.message)}}
 let communityData={contributors:[],trending:[],collections:[]};
 let communityRefreshAt=0;
+let fallbackCommunityVisitorKey="";
 function visitorKey(){
- const key="library-community-visitor";let value=localStorage.getItem(key);
- if(!value){value=window.crypto&&crypto.randomUUID?crypto.randomUUID():"visitor-"+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(key,value)}
- return value;
+ const makeKey=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():"visitor-"+Math.random().toString(36).slice(2)+Date.now().toString(36);
+ try{
+  const key="library-community-visitor";let value=localStorage.getItem(key);
+  if(!value){value=makeKey();localStorage.setItem(key,value)}
+  return value;
+ }catch(error){
+  if(!fallbackCommunityVisitorKey)fallbackCommunityVisitorKey=makeKey();
+  return fallbackCommunityVisitorKey;
+ }
 }
 function recordPublicFileView(file){
  if(!file||!apiBase())return;
