@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://squashberry.github.io/Read/sitemap.xml
+Sitemap: https://read-674.pages.dev/sitemap.xml
