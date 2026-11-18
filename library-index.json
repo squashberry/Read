@@ -512,6 +512,17 @@
       "size": 779715,
       "kind": "study-material",
       "category": "Nutrition"
+    },
+    {
+      "id": "064",
+      "name": "ANGINA.pptx",
+      "path": "064 - ANGINA.pptx",
+      "size": 52001,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-18T21:30:43.348Z",
+      "uploadedBy": "",
+      "category": "Uncategorised",
+      "transcriptPath": "study-text/064.md"
     }
   ]
 }
