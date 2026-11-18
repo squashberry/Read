@@ -25,10 +25,10 @@ jobs:
           node <<'NODE'
           const fs = require('node:fs');
           const html = fs.readFileSync('index.html', 'utf8');
-          const inlineScripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+          const inlineScripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
           let parsedInlineScripts = 0;
           for (const match of inlineScripts) {
-            if (/\\btype=["']application\\/ld\\+json["']/i.test(match[1])) continue;
+            if (/\btype=["']application\/ld\+json["']/i.test(match[1])) continue;
             if (match[2].trim()) { new Function(match[2]); parsedInlineScripts++; }
           }
           if (parsedInlineScripts < 2) throw new Error('Expected both the splash loader and main app JavaScript');
