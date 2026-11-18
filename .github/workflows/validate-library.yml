@@ -48,14 +48,14 @@ jobs:
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
-            'async function toggleDailyReminders()', 'vapidPublicKey',
+            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'id="splashBoot"', 'href="./splash.js" as="script"', 'overflow-x:clip'
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v17')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v18')) throw new Error('Service worker cache version was not refreshed');
           if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const uploadBatchSource = fs.readFileSync('upload-worker/worker.js', 'utf8');
