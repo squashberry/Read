@@ -622,6 +622,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/074.md"
+    },
+    {
+      "id": "075",
+      "name": "Drugs use in children BK.pdf",
+      "path": "075 - Drugs use in children BK.pdf",
+      "size": 173132,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:41:59.910Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/075.md"
     }
   ]
 }
