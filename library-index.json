@@ -567,6 +567,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/068.md"
+    },
+    {
+      "id": "070",
+      "name": "ASTHMA.pptx",
+      "path": "070 - ASTHMA.pptx",
+      "size": 458425,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:41:35.070Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/070.md"
     }
   ]
 }
