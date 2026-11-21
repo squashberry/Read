@@ -545,6 +545,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/066.md"
+    },
+    {
+      "id": "067",
+      "name": "Childhood Tuberculosis (TB).pptx",
+      "path": "067 - Childhood Tuberculosis (TB).pptx",
+      "size": 19491408,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:33:21.791Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/067.md"
     }
   ]
 }
