@@ -1,4 +1,4 @@
-const CACHE_NAME = "squashberry-library-shell-v20";
+const CACHE_NAME = "squashberry-library-shell-v21";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./og-image.svg", "./upload-config.js", "./splash.js", "./gptinstruction/"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -68,7 +68,11 @@ self.addEventListener("notificationclick", (event) => {
     const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
     for (const client of windows) {
       if (new URL(client.url).origin === self.location.origin) {
-        client.postMessage({type: isShare ? "LIBRARY_OPEN_SHARE" : "LIBRARY_OPEN_HOME"});
+        if (typeof client.navigate === "function") {
+          const navigated = await client.navigate(targetUrl);
+          return (navigated || client).focus();
+        }
+        client.postMessage({type:"LIBRARY_OPEN_URL",url:targetUrl});
         return client.focus();
       }
     }

@@ -48,14 +48,14 @@ jobs:
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
-            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded', 'const BUILT_IN_COLLECTIONS=', 'function getBuiltInCollections()', 'function openBuiltInCollection(id)', 'function openIncomingShare(token)', 'function shareLibraryResource(resourceType,resourceId)', 'Follow this reader for new uploads', 'data-built-in-collection', 'data-curated-book-path', 'Study every book in this collection',
+            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded', 'const BUILT_IN_COLLECTIONS=', 'function getBuiltInCollections()', 'function openBuiltInCollection(id)', 'function openIncomingShare(token)', 'function shareLibraryResource(resourceType,resourceId)', 'function openPublicCreator(creatorId)', 'data-collection-share', 'data-me-popup=\"following\"', 'Enable new-upload notifications', 'for new uploads ↗', 'data-built-in-collection', 'data-curated-book-path', 'Study every book in this collection',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'id="splashBoot"', 'href="./splash.js" as="script"', 'overflow-x:clip'
           ];
           for (const marker of requiredUi) {
             if (!html.includes(marker)) throw new Error('Missing app requirement: ' + marker);
           }
-          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v20')) throw new Error('Service worker cache version was not refreshed');
+          if (!fs.readFileSync('sw.js', 'utf8').includes('shell-v21')) throw new Error('Service worker cache version was not refreshed');
           if (html.includes('Skip intro') || html.includes('skip:function')) throw new Error('The cinematic splash must not have a skip path');
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const uploadBatchSource = fs.readFileSync('upload-worker/worker.js', 'utf8');
@@ -64,6 +64,7 @@ jobs:
           if (!uploadBatchSource.includes('ALLOWED_ORIGIN = "https://letsread.pages.dev"')) throw new Error('Upload Worker CORS must allow the new Library domain');
           if (!html.includes('library-moved') || !html.includes('Go to the new Library') || !html.includes('https://letsread.pages.dev/')) throw new Error('The old GitHub Pages URL must show the new-site notice');
           if (!html.includes('80 MB total') || !html.includes('80*1024*1024') || !uploadBatchSource.includes('MAX_REQUEST_BYTES = 80 * 1024 * 1024')) throw new Error('The uploader must enforce the total 80 MB batch limit');
+          if (!html.includes('20*1024*1024') || !html.includes('oversizedFiles')) throw new Error('The uploader must enforce a 20 MiB per-file limit and name oversized files');
           if (!html.includes('up to 24') || !html.includes('uploadQueue.length>24')) throw new Error('Uploader UI must enforce the 24-file batch limit');
           if (!html.includes('openUploadTitleConfirmation(cfg)') || !html.includes('Yes, continue') || !html.includes('cancelUploadTitleConfirm')) throw new Error('Missing editable title confirmation popup');
           if (!html.includes('80 MB total') || !html.includes('80*1024*1024') || !uploadBatchSource.includes('MAX_REQUEST_BYTES = 80 * 1024 * 1024')) throw new Error('Uploader must enforce a safe 80 MB total batch size');
