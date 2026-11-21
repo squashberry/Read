@@ -644,6 +644,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/076.md"
+    },
+    {
+      "id": "077",
+      "name": "Growth Cycle.pptx",
+      "path": "077 - Growth Cycle.pptx",
+      "size": 68999,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:42:08.955Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/077.md"
     }
   ]
 }
