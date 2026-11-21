@@ -534,6 +534,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/065.md"
+    },
+    {
+      "id": "066",
+      "name": "MALARIA IN CHILDREN.pptx",
+      "path": "066 - MALARIA IN CHILDREN.pptx",
+      "size": 7426647,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:33:12.061Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/066.md"
     }
   ]
 }
