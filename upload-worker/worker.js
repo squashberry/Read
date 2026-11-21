@@ -511,7 +511,7 @@ async function handleCreateShare(request,env){
  const type=cleanText(body.resourceType,20).toLowerCase();
  let resourceId=cleanText(body.resourceId,100),exists=null;
  if(type==="file"){
-  resourceId=resourceId.replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"");
+  resourceId=resourceId.replace(/[^0-9]/g,"").padStart(3,"0");
   if(!resourceId)return response({error:"Choose a valid uploaded book or slide deck."},400);
   exists=await env.DB.prepare("SELECT file_id FROM uploads WHERE user_id=? AND file_id=?").bind(user.id,resourceId).first();
  }else if(type==="collection"){
@@ -949,10 +949,14 @@ export default {
       }
 
       if (path === "/shares" && request.method === "POST") return await handleCreateShare(request,env);
-      const shareMatch=path.match(/^\\/shares\\/([a-f0-9]{32})$/i);
-      if (shareMatch && request.method === "GET") return await handleReadShare(shareMatch[1],env);
-      const creatorMatch=path.match(/^\\/contributors\\/([a-f0-9-]{36})$/i);
-      if (creatorMatch && request.method === "GET") return await handlePublicCreator(creatorMatch[1],env);
+      if (path.startsWith("/shares/") && request.method === "GET") {
+        const shareToken=path.slice("/shares/".length);
+        if (/^[a-f0-9]{32}$/i.test(shareToken)) return await handleReadShare(shareToken,env);
+      }
+      if (path.startsWith("/contributors/") && request.method === "GET") {
+        const creatorId=path.slice("/contributors/".length);
+        if (/^[a-f0-9-]{36}$/i.test(creatorId)) return await handlePublicCreator(creatorId,env);
+      }
       if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
