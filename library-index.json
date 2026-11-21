@@ -600,6 +600,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/072.md"
+    },
+    {
+      "id": "073",
+      "name": "CLINICAL FEATURES OF SAM.pptx",
+      "path": "073 - CLINICAL FEATURES OF SAM.pptx",
+      "size": 361047,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:41:49.853Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/073.md"
     }
   ]
 }
