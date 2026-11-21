@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   time_zone TEXT NOT NULL DEFAULT 'Africa/Banjul',
   reminder_time TEXT NOT NULL DEFAULT '08:00',
   enabled INTEGER NOT NULL DEFAULT 1,
+  upload_notifications INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   last_sent_date TEXT NOT NULL DEFAULT ''
@@ -79,3 +80,14 @@ CREATE TABLE IF NOT EXISTS document_requests (id TEXT PRIMARY KEY,user_id TEXT N
 CREATE INDEX IF NOT EXISTS document_requests_user_idx ON document_requests(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS file_views (id TEXT PRIMARY KEY,file_path TEXT NOT NULL,file_id TEXT NOT NULL DEFAULT '',file_name TEXT NOT NULL,visitor_key TEXT NOT NULL,view_date TEXT NOT NULL,viewed_at INTEGER NOT NULL,UNIQUE(file_path,visitor_key,view_date));
 CREATE INDEX IF NOT EXISTS file_views_week_idx ON file_views(view_date,file_path);
+
+CREATE TABLE IF NOT EXISTS share_links (
+  token TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  resource_type TEXT NOT NULL CHECK(resource_type IN ('file','collection')),
+  resource_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  UNIQUE(owner_id,resource_type,resource_id)
+);
+CREATE INDEX IF NOT EXISTS share_links_owner_idx ON share_links(owner_id,created_at DESC);

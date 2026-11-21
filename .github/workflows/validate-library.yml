@@ -48,7 +48,7 @@ jobs:
             '$("chatLibraryBtn").addEventListener("click",()=>openChat(basePrompt()));',
              'const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"}',
             'Topic, file name or code (e.g. 012)', 'showPopupThisVisit', 'library-popup-visits', 'toast.timer=setTimeout(()=>node.classList.remove("show"),20000)',
-            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded', 'const BUILT_IN_COLLECTIONS=', 'function getBuiltInCollections()', 'function openBuiltInCollection(id)', 'data-built-in-collection', 'data-curated-book-path', 'Study every book in this collection',
+            'async function toggleDailyReminders()', 'vapidPublicKey', 'data-filter="collections"', 'id="pickPublicCollection"', 'function showPublicCollectionStudyPicker(mode)', 'function openCollectionShelf()', 'communityCollectionsLoaded', 'const BUILT_IN_COLLECTIONS=', 'function getBuiltInCollections()', 'function openBuiltInCollection(id)', 'function openIncomingShare(token)', 'function shareLibraryResource(resourceType,resourceId)', 'Follow this reader for new uploads', 'data-built-in-collection', 'data-curated-book-path', 'Study every book in this collection',
             'property="og:image"', 'name="twitter:card"', 'application/ld+json',
             'id="splashBoot"', 'href="./splash.js" as="script"', 'overflow-x:clip'
           ];
@@ -60,6 +60,7 @@ jobs:
           if (!fs.readFileSync('sw.js', 'utf8').includes('./splash.js')) throw new Error('The splash script must be precached by the service worker');
           const uploadBatchSource = fs.readFileSync('upload-worker/worker.js', 'utf8');
           if (!uploadBatchSource.includes('MAX_FILES_PER_REQUEST = 24')) throw new Error('Upload Worker must accept batches of up to 24 files');
+          if (!uploadBatchSource.includes('MAX_UPLOAD_FILE_BYTES = 20 * 1024 * 1024') || !uploadBatchSource.includes('MAX_REVIEW_PDF_BYTES = 8 * 1024 * 1024')) throw new Error('Uploads must allow 20 MiB per file while keeping PDF AI review bounds separate');
           if (!uploadBatchSource.includes('ALLOWED_ORIGIN = "https://letsread.pages.dev"')) throw new Error('Upload Worker CORS must allow the new Library domain');
           if (!html.includes('library-moved') || !html.includes('Go to the new Library') || !html.includes('https://letsread.pages.dev/')) throw new Error('The old GitHub Pages URL must show the new-site notice');
           if (!html.includes('80 MB total') || !html.includes('80*1024*1024') || !uploadBatchSource.includes('MAX_REQUEST_BYTES = 80 * 1024 * 1024')) throw new Error('The uploader must enforce the total 80 MB batch limit');

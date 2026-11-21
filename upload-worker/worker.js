@@ -2,7 +2,8 @@ const OWNER = "squashberry";
 const REPO = "Read";
 const BRANCH = "master";
 const ALLOWED_ORIGIN = "https://letsread.pages.dev";
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
+const MAX_REVIEW_PDF_BYTES = 8 * 1024 * 1024;
+const MAX_UPLOAD_FILE_BYTES = 20 * 1024 * 1024;
 const MAX_REQUEST_BYTES = 80 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 24;
 const DAILY_IP_FILE_LIMIT = 100;
@@ -145,7 +146,7 @@ async function handleUploadReview(request, env) {
   ));
   if (!hasReadableText && !requestedManual && extension(sourceName) === "pdf" && typeof body.pdfBase64 === "string") {
     const encoded = body.pdfBase64.replace(/\s/g, "");
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length > Math.ceil(MAX_FILE_BYTES * 4 / 3) + 8) {
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded) || encoded.length > Math.ceil(MAX_REVIEW_PDF_BYTES * 4 / 3) + 8) {
       return response({error:"The PDF could not be prepared for AI review. Try again or choose manual review.",needsManual:true},400);
     }
     try {
@@ -154,7 +155,7 @@ async function handleUploadReview(request, env) {
     } catch {
       return response({error:"The PDF data was invalid. Re-select the file and try again.",needsManual:true},400);
     }
-    if (!pdfBytes.length || pdfBytes.length > MAX_FILE_BYTES || await sha256BytesHex(pdfBytes) !== fileHash) {
+    if (!pdfBytes.length || pdfBytes.length > MAX_REVIEW_PDF_BYTES || await sha256BytesHex(pdfBytes) !== fileHash) {
       return response({error:"The PDF changed while it was being reviewed. Re-select it and try again.",needsManual:true},400);
     }
   }
@@ -491,6 +492,67 @@ async function handleFollow(request,env,contributorId="") {
  }
  return response({error:"Method not allowed."},405);
 }
+
+let shareLinksTableReady=false;
+async function ensureShareLinksTable(env){
+ if(shareLinksTableReady)return;
+ await env.DB.prepare("CREATE TABLE IF NOT EXISTS share_links (token TEXT PRIMARY KEY,owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,resource_type TEXT NOT NULL CHECK(resource_type IN ('file','collection')),resource_id TEXT NOT NULL,created_at INTEGER NOT NULL,active INTEGER NOT NULL DEFAULT 1,UNIQUE(owner_id,resource_type,resource_id))").run();
+ await env.DB.prepare("CREATE INDEX IF NOT EXISTS share_links_owner_idx ON share_links(owner_id,created_at DESC)").run();
+ shareLinksTableReady=true;
+}
+function shareRawFileUrl(path){
+ return "https://raw.githubusercontent.com/"+OWNER+"/"+REPO+"/"+BRANCH+"/"+String(path||"").split("/").map(encodeURIComponent).join("/");
+}
+async function handleCreateShare(request,env){
+ const user=await getSessionUser(request,env);
+ if(!user)return response({error:"Sign in before sharing a Library book or collection."},401);
+ await ensureShareLinksTable(env);
+ const body=await requestJson(request);
+ const type=cleanText(body.resourceType,20).toLowerCase();
+ let resourceId=cleanText(body.resourceId,100),exists=null;
+ if(type==="file"){
+  resourceId=resourceId.replace(/[^0-9]/g,"").replace(/^0+(?=\d)/,"");
+  if(!resourceId)return response({error:"Choose a valid uploaded book or slide deck."},400);
+  exists=await env.DB.prepare("SELECT file_id FROM uploads WHERE user_id=? AND file_id=?").bind(user.id,resourceId).first();
+ }else if(type==="collection"){
+  exists=await env.DB.prepare("SELECT id FROM collections WHERE user_id=? AND id=?").bind(user.id,resourceId).first();
+ }else return response({error:"Choose a book or collection to share."},400);
+ if(!exists)return response({error:"Only your own uploaded books and collections can be shared from this account."},404);
+ const now=Math.floor(Date.now()/1000);
+ await env.DB.prepare("UPDATE users SET allow_followers=1,updated_at=? WHERE id=?").bind(now,user.id).run();
+ let existing=await env.DB.prepare("SELECT token FROM share_links WHERE owner_id=? AND resource_type=? AND resource_id=? AND active=1 LIMIT 1").bind(user.id,type,resourceId).first();
+ if(!existing){
+  const token=crypto.randomUUID().replace(/-/g,"");
+  await env.DB.prepare("INSERT INTO share_links (token,owner_id,resource_type,resource_id,created_at,active) VALUES (?,?,?,?,?,1)").bind(token,user.id,type,resourceId,now).run();
+  existing={token};
+ }
+ return response({ok:true,token:existing.token,url:"https://letsread.pages.dev/?share="+encodeURIComponent(existing.token),resourceType:type,message:"Share link ready. Readers can follow you for new uploads."},201);
+}
+async function handleReadShare(token,env){
+ await ensureShareLinksTable(env);
+ const row=await env.DB.prepare("SELECT s.token,s.owner_id,s.resource_type,s.resource_id,u.display_name,u.allow_followers FROM share_links s JOIN users u ON u.id=s.owner_id WHERE s.token=? AND s.active=1 LIMIT 1").bind(cleanText(token,40)).first();
+ if(!row)return response({error:"This share link is unavailable or has been removed."},404);
+ const owner={id:row.owner_id,displayName:cleanText(row.display_name,50)||"A Library reader"};
+ if(row.resource_type==="file"){
+  const file=await env.DB.prepare("SELECT file_id,file_name,file_path,file_size FROM uploads WHERE user_id=? AND file_id=? LIMIT 1").bind(row.owner_id,row.resource_id).first();
+  if(!file)return response({error:"The shared book is no longer available."},404);
+  return response({ok:true,share:{token:row.token,type:"file",owner,file:{id:String(file.file_id).padStart(3,"0"),name:file.file_name,path:file.file_path,size:Number(file.file_size||0),download_url:shareRawFileUrl(file.file_path)}}});
+ }
+ const collection=await env.DB.prepare("SELECT id,name,description FROM collections WHERE id=? AND user_id=? LIMIT 1").bind(row.resource_id,row.owner_id).first();
+ if(!collection)return response({error:"The shared collection is no longer available."},404);
+ const items=await env.DB.prepare("SELECT file_path,file_id,file_name FROM collection_items WHERE collection_id=? ORDER BY added_at DESC").bind(collection.id).all();
+ const files=(items.results||[]).map(file=>({id:String(file.file_id||""),name:file.file_name,path:file.file_path,download_url:shareRawFileUrl(file.file_path)}));
+ return response({ok:true,share:{token:row.token,type:"collection",owner,collection:{id:collection.id,name:collection.name,description:collection.description||"",files}}});
+}
+async function handlePublicCreator(creatorId,env){
+ const id=cleanText(creatorId,64);
+ const owner=await env.DB.prepare("SELECT id,display_name FROM users WHERE id=? AND allow_followers=1 LIMIT 1").bind(id).first();
+ if(!owner)return response({error:"This contributor is not currently sharing a public upload shelf."},404);
+ const rows=await env.DB.prepare("SELECT up.file_id,up.file_name,up.file_path,up.file_size,up.created_at,COALESCE(c.category,'Uncategorised') AS category FROM uploads up LEFT JOIN upload_categories c ON c.file_id=up.file_id AND c.user_id=up.user_id WHERE up.user_id=? ORDER BY up.created_at DESC LIMIT 100").bind(id).all();
+ const files=(rows.results||[]).map(file=>({id:String(file.file_id).padStart(3,"0"),name:file.file_name,path:file.file_path,size:Number(file.file_size||0),category:file.category||"Uncategorised",createdAt:file.created_at,download_url:shareRawFileUrl(file.file_path)}));
+ return response({ok:true,creator:{id:owner.id,displayName:owner.display_name,files}});
+}
+
 async function handleCollections(request,env,collectionId="") {
  const user=await getSessionUser(request,env);
  if (!user) return response({error:"Sign in to manage your collections."},401);
@@ -550,7 +612,7 @@ async function handleUpload(request, env) {
   let totalUploadBytes = 0;
   for (const file of uploads) {
     if (!ALLOWED_EXTENSIONS.has(extension(file.name))) return response({error:"Unsupported file type: "+safeName(file.name)},400);
-    if (file.size <= 0 || file.size > MAX_FILE_BYTES) return response({error:"Each file must be smaller than 8 MB: "+safeName(file.name)},413);
+    if (file.size <= 0 || file.size > MAX_UPLOAD_FILE_BYTES) return response({error:"“"+safeName(file.name)+"” is "+(file.size/1048576).toFixed(2)+" MiB. The per-file limit is 20 MiB.",file:safeName(file.name),fileBytes:file.size,maxFileBytes:MAX_UPLOAD_FILE_BYTES},413);
     totalUploadBytes += file.size;
   }
   if (totalUploadBytes > MAX_REQUEST_BYTES) {
@@ -662,11 +724,13 @@ async function handleUpload(request, env) {
         console.error("Library file was published but dashboard history could not be saved:",cleanText(historyError && historyError.message,200));
       }
     }
+    await sendFollowerUploadNotifications(env,user,uploaded);
     return response({ok:true,files:uploaded});
   } catch (error) {
     const detail = cleanText(error && error.message,180);
     console.error("Library upload failed at "+stage, detail);
     if (uploaded.length) {
+      await sendFollowerUploadNotifications(env,user,uploaded);
       return response({
         ok:true,
         partial:true,
@@ -743,6 +807,24 @@ async function encryptPush(subscription,payload) {
   header.set(senderPublic,21);
   return joinBytes([header,ciphertext]);
 }
+async function sendFollowerUploadNotifications(env,user,uploaded){
+ if(!uploaded||!uploaded.length||!env.DB||!env.VAPID_PRIVATE_KEY||!env.VAPID_PUBLIC_KEY)return;
+ try{await ensurePushUploadNotificationsColumn(env)}catch(error){console.warn("Follower notification column unavailable:",cleanText(error&&error.message,120));return}
+ const rows=await env.DB.prepare("SELECT ps.endpoint,ps.p256dh,ps.auth FROM follows f JOIN push_subscriptions ps ON ps.user_id=f.follower_id WHERE f.contributor_id=? AND ps.upload_notifications=1").bind(user.id).all();
+ const subscriptions=rows.results||[];
+ if(!subscriptions.length)return;
+ const name=cleanText(user.display_name,50)||"A Library contributor";
+ const titles=uploaded.slice(0,2).map(item=>cleanText(item.name,80)).filter(Boolean);
+ const extra=uploaded.length>2?" and "+(uploaded.length-2)+" more":"";
+ const body=uploaded.length===1?"Added "+(titles[0]||"a new study file")+". Tap to open the updated shelf.":"Added "+uploaded.length+" new study files, including "+titles.join(" and ")+extra+". Tap to see the complete shelf.";
+ for(const row of subscriptions){
+  try{
+   const result=await sendWebPush(row,{title:"New uploads from "+name,body,tag:"library-new-uploads-"+user.id+"-"+Date.now(),url:"https://letsread.pages.dev/?creator="+encodeURIComponent(user.id)},env);
+   if(result.status===404||result.status===410)await env.DB.prepare("DELETE FROM push_subscriptions WHERE endpoint=?").bind(row.endpoint).run();
+  }catch(error){console.warn("Follower upload notification failed:",cleanText(error&&error.message,140))}
+ }
+}
+
 async function sendWebPush(row,payload,env) {
   if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY) throw new Error("Push server keys are not configured.");
   if (!allowedPushEndpoint(row.endpoint)) throw new Error("Unsupported push endpoint.");
@@ -757,10 +839,21 @@ async function sendWebPush(row,payload,env) {
     "urgency":"normal"
   },body});
 }
+
+let pushUploadNotificationsColumnReady=false;
+async function ensurePushUploadNotificationsColumn(env){
+ if(pushUploadNotificationsColumnReady)return;
+ const info=await env.DB.prepare("PRAGMA table_info(push_subscriptions)").all();
+ const hasColumn=(info.results||[]).some(column=>column.name==="upload_notifications");
+ if(!hasColumn)await env.DB.prepare("ALTER TABLE push_subscriptions ADD COLUMN upload_notifications INTEGER NOT NULL DEFAULT 0").run();
+ pushUploadNotificationsColumnReady=true;
+}
+
 async function handlePushSubscribe(request,env) {
   const user = await getSessionUser(request,env);
-  if (!user) return response({error:"Sign in to enable daily reminders."},401);
+  if (!user) return response({error:"Sign in to enable notifications."},401);
   if (!env.VAPID_PRIVATE_KEY || !env.VAPID_PUBLIC_KEY || !env.DB) return response({error:"Browser push is not configured on the Library server yet."},503);
+  await ensurePushUploadNotificationsColumn(env);
   const body = await requestJson(request);
   const subscription = body.subscription || {};
   const endpoint = String(subscription.endpoint || "");
@@ -768,26 +861,29 @@ async function handlePushSubscribe(request,env) {
   const auth = String(subscription.keys && subscription.keys.auth || "");
   const reminderTime = cleanText(body.reminderTime || "08:00",5);
   const timeZone = cleanText(body.timeZone || "Africa/Banjul",80);
-  if (!allowedPushEndpoint(endpoint) || p256dh.length < 40 || auth.length < 16) return response({error:"The browser returned an invalid push subscription. Please try enabling reminders again."},400);
-  if (!/^([01]\d|2[0-3]):00$/.test(reminderTime)) return response({error:"Choose a whole-hour reminder time."},400);
+  const dailyReminders = body.dailyReminders !== false;
+  const uploadNotifications = body.uploadNotifications === true;
+  if (!allowedPushEndpoint(endpoint) || p256dh.length < 40 || auth.length < 16) return response({error:"The browser returned an invalid push subscription. Please try enabling notifications again."},400);
+  if (dailyReminders && !/^([01]\d|2[0-3]):00$/.test(reminderTime)) return response({error:"Choose a whole-hour reminder time."},400);
   try { new Intl.DateTimeFormat("en-US",{timeZone}).format(new Date()); }
   catch { return response({error:"The browser time zone is not supported. Refresh and try again."},400); }
   const now = Math.floor(Date.now()/1000);
-  await env.DB.prepare("INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth,time_zone,reminder_time,enabled,created_at,updated_at,last_sent_date) VALUES (?,?,?,?,?,?,1,?,?, '') ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,time_zone=excluded.time_zone,reminder_time=excluded.reminder_time,enabled=1,updated_at=excluded.updated_at")
-    .bind(endpoint,user.id,p256dh,auth,timeZone,reminderTime,now,now).run();
-  return response({ok:true,enabled:true,reminderTime,timeZone,message:"Daily study reminders are enabled."});
+  await env.DB.prepare("INSERT INTO push_subscriptions (endpoint,user_id,p256dh,auth,time_zone,reminder_time,enabled,upload_notifications,created_at,updated_at,last_sent_date) VALUES (?,?,?,?,?,?,?,?,?,?,'') ON CONFLICT(endpoint) DO UPDATE SET user_id=excluded.user_id,p256dh=excluded.p256dh,auth=excluded.auth,time_zone=excluded.time_zone,reminder_time=CASE WHEN excluded.enabled=1 THEN excluded.reminder_time ELSE push_subscriptions.reminder_time END,enabled=CASE WHEN excluded.enabled=1 THEN 1 ELSE push_subscriptions.enabled END,upload_notifications=CASE WHEN excluded.upload_notifications=1 THEN 1 ELSE push_subscriptions.upload_notifications END,updated_at=excluded.updated_at")
+    .bind(endpoint,user.id,p256dh,auth,timeZone,reminderTime,dailyReminders?1:0,uploadNotifications?1:0,now,now).run();
+  return response({ok:true,enabled:dailyReminders,uploadNotifications,reminderTime,timeZone,message:uploadNotifications?"New-upload notifications are enabled.":"Notification settings saved."});
 }
 async function handlePushStatus(request,env) {
   const user = await getSessionUser(request,env);
-  if (!user) return response({error:"Sign in to check daily reminders."},401);
+  if (!user) return response({error:"Sign in to check notifications."},401);
+  await ensurePushUploadNotificationsColumn(env);
   const endpoint = new URL(request.url).searchParams.get("endpoint") || "";
   let row;
   if (endpoint && allowedPushEndpoint(endpoint)) {
-    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled FROM push_subscriptions WHERE user_id=? AND endpoint=? LIMIT 1").bind(user.id,endpoint).first();
+    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled,upload_notifications FROM push_subscriptions WHERE user_id=? AND endpoint=? LIMIT 1").bind(user.id,endpoint).first();
   } else {
-    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled FROM push_subscriptions WHERE user_id=? AND enabled=1 ORDER BY updated_at DESC LIMIT 1").bind(user.id).first();
+    row = await env.DB.prepare("SELECT endpoint,reminder_time,time_zone,enabled,upload_notifications FROM push_subscriptions WHERE user_id=? AND (enabled=1 OR upload_notifications=1) ORDER BY updated_at DESC LIMIT 1").bind(user.id).first();
   }
-  return response({ok:true,enabled:Boolean(row && row.enabled && endpoint && row.endpoint===endpoint),reminderTime:row&&row.reminder_time||"08:00",timeZone:row&&row.time_zone||"Africa/Banjul"});
+  return response({ok:true,enabled:Boolean(row && row.enabled && endpoint && row.endpoint===endpoint),uploadNotifications:Boolean(row && row.upload_notifications),reminderTime:row&&row.reminder_time||"08:00",timeZone:row&&row.time_zone||"Africa/Banjul"});
 }
 async function handlePushUnsubscribe(request,env) {
   const user = await getSessionUser(request,env);
@@ -851,6 +947,12 @@ export default {
         if (!pushReady) { if (!env.VAPID_PRIVATE_KEY) missing.push("VAPID_PRIVATE_KEY"); if (!env.VAPID_PUBLIC_KEY) missing.push("VAPID_PUBLIC_KEY"); }
         return response({ok:true,service:"squashberry-library-api",configured:missing.length===0,features:{supabaseAuth:Boolean(env.SUPABASE_URL&&env.SUPABASE_PUBLISHABLE_KEY),uploads:Boolean(env.GITHUB_TOKEN&&env.DB&&env.AUTH_CODE_SECRET),aiFileReview:Boolean(env.GEMINI_API_KEY),browserPush:pushReady},missing});
       }
+
+      if (path === "/shares" && request.method === "POST") return await handleCreateShare(request,env);
+      const shareMatch=path.match(/^\\/shares\\/([a-f0-9]{32})$/i);
+      if (shareMatch && request.method === "GET") return await handleReadShare(shareMatch[1],env);
+      const creatorMatch=path.match(/^\\/contributors\\/([a-f0-9-]{36})$/i);
+      if (creatorMatch && request.method === "GET") return await handlePublicCreator(creatorMatch[1],env);
       if (path === "/auth/me" && (request.method === "GET" || request.method === "PATCH")) return await handleMe(request,env);
       if (path === "/auth/dashboard" && request.method === "GET") return await handleDashboard(request,env);
       if (path === "/auth/activity" && request.method === "POST") return await handleActivity(request,env);
