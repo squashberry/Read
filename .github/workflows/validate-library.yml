@@ -134,7 +134,7 @@ jobs:
           if (uploadHandlerStart < 0 || uploadHandlerEnd < 0 || worker.slice(uploadHandlerStart, uploadHandlerEnd).includes('verifyTurnstile')) {
             throw new Error('File uploads must not require the sign-in Turnstile widget');
           }
-          if (!worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_FILE_BYTES') ||
+          if (!worker.includes('UPLOAD_RATE_LIMIT') || !worker.includes('MAX_UPLOAD_FILE_BYTES') || !worker.includes('MAX_REVIEW_PDF_BYTES') ||
               !worker.includes('SUPABASE_URL') || !worker.includes('SUPABASE_PUBLISHABLE_KEY') ||
               !worker.includes('/auth/me') || !worker.includes('/auth/dashboard') ||
               !worker.includes('getSessionUser(request,env)') || !worker.includes('/push/subscribe') ||
