@@ -523,6 +523,17 @@
       "uploadedBy": "",
       "category": "Uncategorised",
       "transcriptPath": "study-text/064.md"
+    },
+    {
+      "id": "065",
+      "name": "PARTICPANT MANUAL final print.pdf",
+      "path": "065 - PARTICPANT MANUAL final print.pdf",
+      "size": 5799890,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:33:05.368Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/065.md"
     }
   ]
 }
