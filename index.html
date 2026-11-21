@@ -917,15 +917,16 @@ async function toggleReadLater(file){if(!file)return;if(!authState.token||!authS
 function renderDetail(file){
  const body=$("detailBody");if(!body)return;
  if(!file){body.innerHTML='<div class="detail-empty">Pick a file from the shelf to see what it holds.</div>';return}
- const ext=extOf(file.name);
- body.innerHTML='<div class="detail-cover">'+coverHTML(file)+'</div><h3 class="detail-title">'+esc(niceName(file.name))+'</h3><p class="detail-sub">'+esc(categoryOf(file))+(file.uploadedBy?" · "+esc(file.uploadedBy):" · Library study material")+'</p><div class="detail-stats"><div><strong>'+esc(fileId(file))+'</strong><span>file no.</span></div><i></i><div><strong>'+esc(prettySize(file.size))+'</strong><span>size</span></div><i></i><div><strong id="detailSlides">'+esc(iconFor(ext))+'</strong><span id="detailSlidesLabel">format</span></div></div><div class="detail-plot"><h4>Inside this file</h4><p class="detail-text" id="detailText">Reading the first slides…</p></div><div class="detail-actions"><button class="read-btn" id="detailRead" type="button">Read</button><button class="outline-btn" id="detailSaveLater" type="button">＋ Read later</button><div class="detail-secondary"><button type="button" id="detailLecture">Lecture</button><button type="button" id="detailExam">Exam</button><button type="button" id="detailCards">Flashcards</button></div></div>';
+ const ext=extOf(file.name),owned=isMyUploadedFile(file);
+ body.innerHTML='<div class="detail-cover">'+coverHTML(file)+'</div><h3 class="detail-title">'+esc(niceName(file.name))+'</h3><p class="detail-sub">'+esc(categoryOf(file))+(file.uploadedBy?" · "+esc(file.uploadedBy):" · Library study material")+'</p><div class="detail-stats"><div><strong>'+esc(fileId(file))+'</strong><span>file no.</span></div><i></i><div><strong>'+esc(prettySize(file.size))+'</strong><span>size</span></div><i></i><div><strong id="detailSlides">'+esc(iconFor(ext))+'</strong><span id="detailSlidesLabel">format</span></div></div><div class="detail-plot"><h4>Inside this file</h4><p class="detail-text" id="detailText">Reading the first slides…</p></div><div class="detail-actions"><button class="read-btn" id="detailRead" type="button">Read</button><button class="outline-btn" id="detailSaveLater" type="button">＋ Read later</button>'+(owned?'<button class="outline-btn detail-share-btn" id="detailShareBook" type="button">Share this book / slides ↗</button>':'')+'<div class="detail-secondary"><button type="button" id="detailLecture">Lecture</button><button type="button" id="detailExam">Exam</button><button type="button" id="detailCards">Flashcards</button></div></div>';
  $("detailRead").onclick=()=>openFile(file);$("detailSaveLater").textContent=isReadLater(file)?"✓ Saved":"＋ Read later";$("detailSaveLater").onclick=()=>toggleReadLater(file);
+ const shareButton=$("detailShareBook");if(shareButton)shareButton.onclick=()=>shareLibraryResource("file",fileId(file),niceName(file.name));
  $("detailLecture").onclick=()=>{logAccountActivity("started-study","Started lecture study session");openChat(promptFor("lecture",file))};
  $("detailExam").onclick=()=>{logAccountActivity("started-study","Started exam study session");openChat(promptFor("exam",file))};
  $("detailCards").onclick=()=>{logAccountActivity("started-study","Started flashcards study session");openChat(promptFor("flashcards",file))};
  if(file.uploadedByUserId){
-  const follow=document.createElement("button");follow.type="button";follow.className="outline-btn contributor-follow-btn";follow.textContent=isFollowingContributor(file.uploadedByUserId)?"Following · "+file.uploadedBy:"Follow "+file.uploadedBy;
-  follow.addEventListener("click",()=>toggleContributorFollow(file.uploadedByUserId));
+  const follow=document.createElement("button");follow.type="button";follow.className="outline-btn contributor-follow-btn";follow.textContent=isFollowingContributor(file.uploadedByUserId)?"Following · "+(file.uploadedBy||"reader"):"Follow for new uploads";
+  follow.addEventListener("click",async()=>{await toggleContributorFollow(file.uploadedByUserId);if(state.selected)renderDetail(state.selected)});
   const title=body.querySelector(".detail-title");if(title)title.after(follow);
  }
  hydrateDetail(file)
@@ -1120,6 +1121,7 @@ function hideSplash(){}
 function openChat(prompt){const url="https://chatgpt.com/?q="+encodeURIComponent(prompt);window.open(url,"_blank","noopener,noreferrer")}
 function basePrompt(){return "Let’s study using SquashberryLibrary. Follow the study instructions at "+INSTRUCTION_URL+". I may ask for one file ID or a complete collection. When I give you a collection name and a list of Library file IDs, read every listed original document together; do not stop after the first file or ask me to choose one."}
 function fileId(file){const item=manifest.items.find(x=>x.path===file.path);return item?String(item.id).padStart(3,"0"):"---";}
+function isMyUploadedFile(file){return Boolean(file&&authState.user&&authState.dashboard&&Array.isArray(authState.dashboard.uploads)&&authState.dashboard.uploads.some(item=>item.path===file.path));}
 function promptFor(mode,file){
 const modeLabels={read:"Read",lecture:"Lecture",exam:"Exam",flashcards:"Flashcards",summary:"Summary"};
 const modeLabel=modeLabels[mode]||"Read";
@@ -1442,7 +1444,7 @@ async function uploadFileBase64(file){
 }
 async function requestUploadReview(item,manual){
  const body={name:item.file.name,fileHash:item.fileHash,text:item.text||"",title:item.title,manual:manual===true,confirmManual:true};
- if(!manual&&extOf(item.file.name)==="pdf"&&(item.text||"").trim().length<30){
+ if(!manual&&extOf(item.file.name)==="pdf"&&item.file.size<=8*1024*1024&&(item.text||"").trim().length<30){
   body.pdfBase64=item.pdfBase64||(item.pdfBase64=await uploadFileBase64(item.file));
  }
  const response=await fetch(apiBase()+"/upload/review",{method:"POST",headers:{Authorization:"Bearer "+authState.token,"Content-Type":"application/json"},body:JSON.stringify(body)});
@@ -1604,7 +1606,7 @@ async function handleEasyUpload(cfg){
  if(uploadQueue.length>24){toast("Choose no more than 24 files at a time.");return}
  if(!ack.checked){toast("Please confirm that these files can be public.");return}
  if(!studyAck.checked){toast("Please confirm that these are study materials.");return}
- if(uploadQueue.some(item=>item.file.size<=0||item.file.size>8*1024*1024)){toast("Each file must be smaller than 8 MB.");return}
+ const oversizedFiles=uploadQueue.filter(item=>item.file.size<=0||item.file.size>20*1024*1024);if(oversizedFiles.length){const names=oversizedFiles.map(item=>item.file.name+" ("+prettySize(item.file.size)+")").join(", ");toast("These files exceed the 20 MiB per-file limit: "+names);return}
  if(uploadQueue.reduce((sum,item)=>sum+item.file.size,0)>80*1024*1024){toast("Selected files exceed the 80 MB total limit. Split this batch into smaller uploads.");return}
  if(!authState.token||!authState.user){closeModal();authState.afterAuthAction="upload";openAuthModal();return}
  if(uploadQueue.some(item=>item.review&&item.review.relevant===false)){toast("Remove files marked unrelated to study.");syncUploadButton();return}
@@ -1819,11 +1821,49 @@ function openDocumentRequestModal(){
  $("modalBackdrop").classList.add("show");$("cancelDocumentRequest").onclick=closeModal;
  $("submitDocumentRequest").onclick=async()=>{const button=$("submitDocumentRequest"),title=$("documentRequestTitle").value.trim(),subject=$("documentRequestSubject").value.trim(),details=$("documentRequestDetails").value.trim(),status=$("documentRequestStatus");if(title.length<3){status.textContent="Enter the document or topic you need.";return}button.disabled=true;button.textContent="Sending…";try{await apiFetch("/document-requests",{method:"POST",body:JSON.stringify({title,subject,details})});await refreshDashboard();status.textContent="Request received. You can track it under My Page → Document requests.";button.textContent="Request sent ✓";button.onclick=closeModal;button.disabled=false;toast("Document request submitted.");}catch(error){status.textContent=error.message;button.disabled=false;button.textContent="Send request ↗"}}
 }
+async function shareLibraryResource(resourceType,resourceId,label){
+ if(!authState.token||!authState.user){authState.afterAuthAction="share:"+resourceType+":"+resourceId;openAuthModal();return}
+ try{
+  const result=await apiFetch("/shares",{method:"POST",body:JSON.stringify({resourceType,resourceId:String(resourceId)})});
+  const url=result.url||("https://letsread.pages.dev/?share="+encodeURIComponent(result.token));
+  const title=String(label||"Library material"),message="I shared "+title+" with you on Squashberry Library. Open it here: "+url;
+  if(navigator.share){
+   try{await navigator.share({title:"Squashberry Library · "+title,text:message,url});toast("Share link opened. Readers can follow you for new uploads.");return}
+   catch(error){if(error&&error.name==="AbortError")return}
+  }
+  await copyText(url);toast("Share link copied. Readers can follow you for your new uploads.");
+ }catch(error){toast("Could not create the share link: "+error.message)}
+}
+async function requestFollowerNotifications(){
+ if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window))return false;
+ let permission=Notification.permission;
+ if(permission==="default")permission=await Notification.requestPermission();
+ if(permission!=="granted")return false;
+ const registration=await currentServiceWorkerRegistration();
+ let subscription=await registration.pushManager.getSubscription();
+ if(!subscription){
+  const cfg=window.LIBRARY_UPLOAD_CONFIG||{};
+  if(!cfg.vapidPublicKey)throw new Error("The push notification key is not configured.");
+  subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:decodeBase64Url(cfg.vapidPublicKey)});
+ }
+ const timeZone=Intl.DateTimeFormat().resolvedOptions().timeZone||"Africa/Banjul";
+ await apiFetch("/push/subscribe",{method:"POST",body:JSON.stringify({subscription:subscription.toJSON(),timeZone,uploadNotifications:true,dailyReminders:false})});
+ return true;
+}
+
 function isFollowingContributor(id){return Boolean((authState.dashboard&&authState.dashboard.following||[]).some(item=>item.id===id))}
 async function toggleContributorFollow(id){
- if(!authState.token||!authState.user){authState.afterAuthAction="follow:"+id;openAuthModal();return}
+ if(!authState.token||!authState.user){authState.afterAuthAction="follow:"+id;openAuthModal();return false}
  const following=isFollowingContributor(id);
- try{if(following)await apiFetch("/auth/follows/"+encodeURIComponent(id),{method:"DELETE"});else await apiFetch("/auth/follows",{method:"POST",body:JSON.stringify({contributorId:id})});await refreshDashboard();if(state.selected)renderDetail(state.selected);toast(following?"Contributor unfollowed.":"You’re now following this contributor.")}catch(error){toast(error.message)}
+ try{
+  let notificationsReady=false;
+  if(!following){try{notificationsReady=await requestFollowerNotifications()}catch(pushError){console.warn("Follower notifications were not enabled:",pushError)}}
+  if(following)await apiFetch("/auth/follows/"+encodeURIComponent(id),{method:"DELETE"});
+  else await apiFetch("/auth/follows",{method:"POST",body:JSON.stringify({contributorId:id})});
+  await refreshDashboard();if(state.selected)renderDetail(state.selected);
+  toast(following?"You’ve unfollowed this reader.":notificationsReady?"Following. New uploads will send notifications to this device.":"You’re following this reader. Enable browser notifications to receive new-upload alerts.");
+  return !following;
+ }catch(error){toast(error.message);return false}
 }
 function openCollectionEditor(collection=null){
  if(!authState.token||!authState.user){authState.afterAuthAction="create-collection";openAuthModal();return}
