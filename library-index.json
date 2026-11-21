@@ -589,6 +589,17 @@
       "uploadedBy": "",
       "category": "Peads",
       "transcriptPath": "study-text/071.md"
+    },
+    {
+      "id": "072",
+      "name": "LEC 2 CARE OF THE NEWBORN 1.pptx",
+      "path": "072 - LEC 2 CARE OF THE NEWBORN 1.pptx",
+      "size": 380052,
+      "kind": "study-material",
+      "uploadedAt": "2026-11-21T19:41:45.035Z",
+      "uploadedBy": "",
+      "category": "Peads",
+      "transcriptPath": "study-text/072.md"
     }
   ]
 }
